@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         GitHub PR Commits — Newest First
 // @namespace    https://github.com/
-// @version      1.2.0
+// @version      1.3.0
 // @description  Reverse the PR Commits tab so newest commits (and newest day) appear on top
 // @author       Franco Gilio
 // @match        https://github.com/*/*/pull/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @run-at       document-idle
+// @noframes
 // @grant        none
 // ==/UserScript==
 
@@ -49,12 +50,21 @@
         timeline.dataset.reversed = '1';
     }
 
-    reverseCommits();
-
-    const observer = new MutationObserver(reverseCommits);
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'pjax:end']) {
-        document.addEventListener(event, reverseCommits);
+    // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
+    let scheduled = false;
+    function schedule() {
+        if (scheduled) return;
+        scheduled = true;
+        setTimeout(() => {
+            scheduled = false;
+            try { reverseCommits(); } catch (error) { console.error(TAG, error); }
+        }, 50);
     }
+
+    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
+        document.addEventListener(event, schedule);
+    }
+    window.addEventListener('popstate', schedule);
+    schedule();
 })();

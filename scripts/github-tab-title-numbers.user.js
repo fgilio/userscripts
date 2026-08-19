@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         GitHub Issue/PR/Run Number in Tab Title
 // @namespace    https://github.com/
-// @version      1.2.2
+// @version      1.3.0
 // @description  Prefixes the tab title with the issue/PR/discussion number, or on Actions run pages the originating PR number
 // @author       Franco Gilio
 // @match        https://github.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
+// @noframes
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
@@ -126,15 +127,9 @@
     })();
 
     window.addEventListener('popstate', onUrlMaybeChanged);
-    document.addEventListener('turbo:load', onUrlMaybeChanged);
-    document.addEventListener('turbo:render', onUrlMaybeChanged);
-    document.addEventListener('pjax:end', onUrlMaybeChanged);
-
-    let lastPath = location.pathname;
-    setInterval(() => {
-        if (location.pathname !== lastPath) {
-            lastPath = location.pathname;
-            onUrlMaybeChanged();
-        }
-    }, 500);
+    // 'soft-nav:end' is GitHub's React router. With it and the history patch above,
+    // every navigation is covered by an event rather than a poll.
+    for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
+        document.addEventListener(event, onUrlMaybeChanged);
+    }
 })();

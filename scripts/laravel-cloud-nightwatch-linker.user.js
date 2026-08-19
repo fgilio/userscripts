@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         Laravel Cloud ↔ Nightwatch Linker
 // @namespace    http://tampermonkey.net/
-// @version      2.1.1
+// @version      2.2.0
 // @description  Native-looking links between Laravel Cloud environments and Nightwatch dashboards
 // @author       Franco Gilio
 // @match        https://cloud.laravel.com/*
 // @match        https://nightwatch.laravel.com/*
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
+// @noframes
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @run-at       document-idle
@@ -67,7 +68,8 @@
         return uuid.length > 10 ? { envUuid: uuid, region: region } : null;
     }
     function getNightwatchAppEnv() {
-        var combobox = document.querySelector('aside button[role="combobox"], aside button[type="button"]');
+        var combobox = document.querySelector('aside button[role="combobox"]') ||
+                       document.querySelector('aside button[type="button"]');
         if (!combobox) return null;
         var spans = combobox.querySelectorAll('span');
         if (spans.length >= 2) {
@@ -258,7 +260,7 @@ function buildCloudButton(label, href, onClick) {
 
         var aside = document.querySelector('aside');
         if (!aside) return;
-        var firstNavLink = aside.querySelector('a[href*="/dashboard"], a');
+        var firstNavLink = aside.querySelector('a[href*="/dashboard"]') || aside.querySelector('a');
         var navList = firstNavLink ? firstNavLink.parentElement : null;
 
         var link;
@@ -287,7 +289,8 @@ function buildCloudButton(label, href, onClick) {
         if (navList) {
             navList.appendChild(link);
         } else {
-            var combo = aside.querySelector('button[role="combobox"], button[type="button"]');
+            var combo = aside.querySelector('button[role="combobox"]') ||
+                        aside.querySelector('button[type="button"]');
             if (combo && combo.parentElement) combo.parentElement.insertBefore(link, combo.nextSibling);
         }
     }
@@ -320,14 +323,15 @@ function buildCloudButton(label, href, onClick) {
         }
     }
 
-    setTimeout(init, 1000);
+    // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
+    var scheduled = false;
+    function schedule() {
+        if (scheduled) return;
+        scheduled = true;
+        setTimeout(function () { scheduled = false; init(); }, 50);
+    }
 
-    var lastUrl = location.href;
-    var observer = new MutationObserver(function () {
-        if (location.href !== lastUrl) {
-            lastUrl = location.href;
-            setTimeout(init, 1000);
-        }
-    });
-    observer.observe(document.body, { subtree: true, childList: true });
+    new MutationObserver(schedule).observe(document.documentElement, { subtree: true, childList: true });
+    window.addEventListener('popstate', schedule);
+    schedule();
 })();

@@ -7,6 +7,7 @@
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
 // @match        https://cloud.laravel.com/*
 // @run-at       document-idle
+// @noframes
 // @grant        none
 // ==/UserScript==
 

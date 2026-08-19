@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         GitHub Repo & Org Nav Reorder
 // @namespace    https://github.com/
-// @version      3.2.0
+// @version      3.3.0
 // @description  Reorders the repo and org tab navs, flattens the "More" overflow, adds a Releases tab, and hides tab icons without flicker
 // @author       Franco Gilio
 // @match        https://github.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
+// @noframes
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
@@ -224,9 +225,11 @@ ${NAV} ${VIS_SEL}:not([data-gh-ready]) { visibility: hidden !important; }
     armFailsafe();
     boot();
 
-    document.addEventListener('turbo:load', boot);
-    document.addEventListener('turbo:render', boot);
-    document.addEventListener('pjax:end', boot);
+    // 'soft-nav:end' is GitHub's React router, which drives most of github.com.
+    for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
+        document.addEventListener(event, boot);
+    }
+    window.addEventListener('popstate', boot);
 
     // A turbo navigation swaps content without a reload, so re-arm the fail-safe.
     document.addEventListener('turbo:visit', armFailsafe);
