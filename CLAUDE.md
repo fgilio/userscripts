@@ -81,7 +81,7 @@ runs once is a script that works once. `_template.user.js` carries the boot bloc
 tab, so a script scheduled on rAF silently does nothing until the tab is focused. Every
 cmd-clicked link is a background tab. It is also cheaper in the foreground: a 50 ms timer
 caps the callback at 20 Hz where rAF ran it at 60. Reference this paragraph from a script
-rather than restating it. `bin/check.sh` enforces it (rule `raf`).
+rather than restating it. `bin/check.sh` enforces it (rules `raf` and `debounce`).
 
 The `history.pushState` / `replaceState` patch at the bottom of `_template.user.js` is
 **conditional**: include it only when the script's output derives from the URL rather than

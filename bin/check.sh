@@ -17,7 +17,7 @@ files=("$@")
 
 # The rule vocabulary. Every WARN below names one of these, and check-ignore
 # accepts nothing else.
-RULES=(semver wildcard-match icon prompt raf body-start)
+RULES=(semver wildcard-match icon prompt raf body-start noframes tag debounce)
 REQUIRED=(name namespace version description author match run-at grant)
 
 IGNORE_RE='^[[:space:]]*//[[:space:]]*check-ignore:[[:space:]]*([a-z-]+)([[:space:]]+[^[:space:]].*)?$'
@@ -68,6 +68,9 @@ for f in "${files[@]}"; do
   grep -qE '^// @icon[[:space:]]' <<<"$block" ||
     finds+=("icon|no @icon. The script is unidentifiable in the Tampermonkey list")
 
+  grep -qE '^// @noframes' <<<"$block" ||
+    finds+=("noframes|no @noframes. The script also runs in every iframe on the page")
+
   # --- body ---
   # Comments stripped, so prose *about* a footgun is not read as one. The @grant
   # scan uses the same stripped body, so a commented-out GM_ stub (CLAUDE.md
@@ -87,6 +90,15 @@ for f in "${files[@]}"; do
 
   grep -qE 'observe\((document\.)?body' <<<"$body" && grep -q '@run-at *document-start' <<<"$block" &&
     finds+=("body-start|observes document.body at document-start, where body may still be null")
+
+  grep -q 'console\.' <<<"$body" && ! grep -qE '^[[:space:]]*(const|let|var) TAG[[:space:]]*=' <<<"$body" &&
+    finds+=("tag|a console call with no TAG const. Every message should name the script that wrote it")
+
+  # An observer wired straight to the work function runs it on every mutation batch.
+  observers=$(grep -c 'new MutationObserver(' <<<"$body")
+  debounced=$(grep -c 'new MutationObserver(schedule)' <<<"$body")
+  [ "$observers" -gt "$debounced" ] &&
+    finds+=("debounce|a MutationObserver is not wired to schedule(). See CLAUDE.md \"SPA navigation\"")
 
   # node prints "<file>:<line>" then the offending source, then the reason.
   syntax=$(node --check "$f" 2>&1) ||

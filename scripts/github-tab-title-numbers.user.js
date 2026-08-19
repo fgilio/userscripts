@@ -15,6 +15,8 @@
   'use strict';
   // check-ignore: body-start watchBody() null-checks document.body and is only
   // called from boot(), which itself waits for <head> and <title> to exist.
+  // check-ignore: debounce the observers guard on selfWrite and apply() returns
+  // immediately once the title is correct, so a debounce would only add latency.
 
   // The issue/PR/discussion number comes straight from the URL path.
   const NUM_RE = /\/(?:pull|issues|discussions)\/(\d+)(?:[/?#]|$)/;

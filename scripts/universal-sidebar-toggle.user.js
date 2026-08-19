@@ -22,6 +22,8 @@
   'use strict';
 
   // check-ignore: icon spans 10 sites, no single favicon represents it.
+  // check-ignore: noframes the shortcut must work when focus is inside an iframe,
+  // so only Google Docs (which renders the sidebar in several) is gated below.
 
   const TAG = '[sidebar-toggle]';
   const currentHost = location.hostname;
