@@ -1,4 +1,4 @@
-// snippets/anti-flicker.js — hide, rearrange, reveal. No flash of native layout.
+// snippets/anti-flicker.js: hide, rearrange, reveal. No flash of native layout.
 //
 // Needs @run-at document-start. Three parts, all required:
 //   1. CSS injected before first paint hides the target
@@ -34,4 +34,4 @@ function armFailsafe() {
 injectStyle();
 armFailsafe();
 document.addEventListener('turbo:visit', armFailsafe);
-// …then call reveal() at the end of a successful apply().
+// ...then call reveal() at the end of a successful apply().

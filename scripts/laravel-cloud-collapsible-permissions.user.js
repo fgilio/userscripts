@@ -45,7 +45,6 @@
     '<circle cx="11" cy="11" r="8"></circle>' +
     '<line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
 
-  // Inject placeholder color once (native uses a specific muted p3 color)
   function ensurePlaceholderStyle() {
     if (document.getElementById('res-search-ph-style')) return;
     const st = document.createElement('style');
@@ -104,7 +103,6 @@
     header.appendChild(btn);
   }
 
-  // ---- Permissions list (category groups with the collapse arrows) ----
   function findListContainer() {
     const firstArrow = document.querySelector('[' + ARROW_ATTR + ']');
     if (!firstArrow) return null;
@@ -124,8 +122,7 @@
     return { total, checked };
   }
 
-  // React re-renders on each toggle, so click category headers one at a
-  // time with a short delay so state settles between clicks.
+  // Laravel Cloud re-renders on every toggle, so leave a gap between clicks.
   async function setAll(listContainer, checked) {
     for (const g of [...listContainer.children]) {
       const cb = g.children[0] && g.children[0].querySelector('[role=checkbox]');
@@ -161,7 +158,6 @@
   function ensureToolbar() {
     const listContainer = findListContainer();
     if (!listContainer) return;
-    // search box + list share this parent; mount the toolbar as its first child
     const parent = listContainer.parentElement;
     if (parent.querySelector('[' + TOOLBAR_ATTR + ']')) return;
     const bar = document.createElement('div');
@@ -201,12 +197,10 @@
     bar.appendChild(sep);
     bar.appendChild(clearAll);
     parent.insertBefore(bar, parent.firstChild);
-    // keep count fresh when user toggles individual checkboxes
     listContainer.addEventListener('click', () => setTimeout(refreshCount, 80), true);
     refreshCount();
   }
 
-  // ---- Resources list (applications + environments) search ----
   function findResourceList() {
     const permList = findListContainer();
     const candidates = [];
@@ -222,7 +216,7 @@
       candidates.push(el);
     });
     if (!candidates.length) return null;
-    // Prefer a scrollable container; otherwise take the one with most cb rows.
+    // Prefer a scrollable container. Otherwise take the one with the most checkbox rows.
     let best = null, bestScore = -1;
     for (const c of candidates) {
       const oy = getComputedStyle(c).overflowY;
@@ -253,7 +247,7 @@
     box.setAttribute(RES_SEARCH_ATTR, '1');
     // Native Permissions search box: flex/center, 16px column-gap, 12px padding,
     // 0.75px border, top corners rounded 6px + bottom corners square, transparent
-    // bg, no shadow, NO bottom margin — so it sits flush against the list below.
+    // bg, no shadow, NO bottom margin, so it sits flush against the list below.
     box.style.cssText =
       'display:flex;align-items:center;column-gap:16px;' +
       'border:0.75px solid ' + BORDER + ';border-radius:6px 6px 0 0;' +
@@ -312,7 +306,7 @@
     ensureResourceSearch();
   }
 
-  // setTimeout, not rAF — see CLAUDE.md "SPA navigation".
+  // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
   let scheduled = false;
   function scheduleScan() {
     if (scheduled) return;

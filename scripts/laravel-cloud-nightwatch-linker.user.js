@@ -14,15 +14,13 @@
 
 (function () {
     'use strict';
-    // check-ignore: prompt — one-time pairing UI, fires only when a mapping is missing.
+    // check-ignore: prompt one-time pairing UI, fires only when a mapping is missing.
     // Replace with an inline input if this script is ever driven by browser automation.
 
     var STORAGE_KEY = 'laravel-cloud-nightwatch-mappings';
 
-    /* ---------- storage ----------
-       Entry shape (current): { uuid, region, cloudPath }
-       Legacy shape:          "<uuid string>"   <-- migrated automatically
-    */
+    // Entry: { uuid, region, cloudPath }. String entries are the legacy shape
+    // and migrate on read.
     function getMappings() {
         var raw;
         try { raw = JSON.parse(GM_getValue(STORAGE_KEY, '{}')); }
@@ -47,11 +45,10 @@
 
     function getEntry(mappings, key) {
         var e = mappings[key];
-        if (typeof e === 'string') return { uuid: e, region: 'us' }; // extra safety
+        if (typeof e === 'string') return { uuid: e, region: 'us' };
         return e || null;
     }
 
-    /* ---------- url parsing ---------- */
     function parseCloudUrl() {
         var parts = window.location.pathname.split('/').filter(Boolean);
         if (parts.length >= 3) return { org: parts[0], app: parts[1], env: parts[2] };
@@ -81,7 +78,6 @@
         return null;
     }
 
-    /* ---------- icons ---------- */
     // Official Nightwatch favicon (rose badge + white monogram), inlined for offline use.
     function nightwatchIconDataUri() {
         var svg =
@@ -108,9 +104,6 @@
             'V64.97h6.5V6.49H32.486v6.501Zm0 19.492v32.486H64.97V32.485H32.485Z"/></svg>';
     }
 
-    /* =======================================================================
-       LARAVEL CLOUD  ->  NIGHTWATCH
-       ======================================================================= */
     function findVisitButton() {
         var anchors = document.querySelectorAll('a');
         for (var i = 0; i < anchors.length; i++) {
@@ -125,7 +118,6 @@ function buildCloudButton(label, href, onClick) {
         if (template) {
             el = template.cloneNode(true);
 
-            // Swap the cloned <svg> for the Nightwatch favicon <img>, preserving sizing.
             var oldSvg = el.querySelector('svg');
             var img = document.createElement('img');
             img.src = nightwatchIconDataUri();
@@ -141,7 +133,6 @@ function buildCloudButton(label, href, onClick) {
                 el.insertBefore(img, el.firstChild);
             }
 
-            // Replace the visible label text ("Visit") with ours.
             for (var n = 0; n < el.childNodes.length; n++) {
                 if (el.childNodes[n].nodeType === 3 && el.childNodes[n].textContent.trim()) {
                     el.childNodes[n].textContent = label;
@@ -150,7 +141,6 @@ function buildCloudButton(label, href, onClick) {
             }
             el.removeAttribute('data-headlessui-state');
         } else {
-            // Fallback secondary button (no clone target available).
             el = document.createElement('a');
             el.className =
                 'shrink-0 gap-x-1.5 relative isolate inline-flex items-center justify-center rounded-md ' +
@@ -221,9 +211,6 @@ function buildCloudButton(label, href, onClick) {
         container.insertBefore(link, visitBtn);
     }
 
-    /* =======================================================================
-       NIGHTWATCH  ->  LARAVEL CLOUD
-       ======================================================================= */
     function buildNightwatchButton(label, href, onClick) {
         var a = document.createElement('a');
         a.id = 'cloud-link';
@@ -276,11 +263,9 @@ function buildCloudButton(label, href, onClick) {
 
         var link;
         if (existing.cloudPath) {
-            // Org-agnostic: use the real org/app/env captured on the Cloud side.
             link = buildNightwatchButton('Laravel Cloud',
                 'https://cloud.laravel.com/' + existing.cloudPath, null);
         } else {
-            // We don't know the org yet -> let the user link it once (any org supported).
             link = buildNightwatchButton('Link Laravel Cloud', '#', function (e) {
                 e.preventDefault();
                 var u = prompt('Paste the Laravel Cloud environment URL (any org):');
@@ -307,7 +292,6 @@ function buildCloudButton(label, href, onClick) {
         }
     }
 
-    /* ---------- capture cloud path (makes reverse link org-agnostic) ---------- */
     function recordCloudPath() {
         var info = parseCloudUrl();
         if (!info) return;
@@ -322,7 +306,6 @@ function buildCloudButton(label, href, onClick) {
         }
     }
 
-    /* ---------- boot (resilient: one failure won't kill the rest) ---------- */
     function init() {
         var host = window.location.hostname;
         try {

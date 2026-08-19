@@ -1,4 +1,4 @@
-// snippets/gm-store.js — one JSON blob under one GM key, with schema migration.
+// snippets/gm-store.js: one JSON blob under one GM key, with schema migration.
 //
 // Needs @grant GM_getValue and @grant GM_setValue.
 // Everything a script persists lives in a single object so a schema change is
@@ -8,7 +8,7 @@ const STORE_KEY = 'script-name-store';
 const SCHEMA = 2;
 
 // Parsed once, then held. load() is called from apply(), which runs on every
-// DOM mutation — re-parsing the whole blob there costs more the more you store.
+// DOM mutation. Re-parsing the whole blob there costs more the more you store.
 let store = null;
 
 function load() {

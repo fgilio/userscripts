@@ -1,6 +1,6 @@
-// snippets/warn-once.js — say WHY the script stopped working, exactly once.
+// snippets/warn-once.js: say WHY the script stopped working, exactly once.
 //
-// Without this, a site markup change presents as "the script just does nothing".
+// Without this, a site markup change presents as "the script does nothing".
 // With it, the console names the selector that broke.
 
 const TAG = '[script-name]';
@@ -11,7 +11,7 @@ function need(root, selector, what) {
   if (el) { warned.delete(selector); return el; }
   if (!warned.has(selector)) {
     warned.add(selector);
-    console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup probably changed — re-inspect the DOM and update the script.`);
+    console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup changed. Update the selector in this script.`);
   }
   return null;
 }

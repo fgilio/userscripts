@@ -1,14 +1,14 @@
-// snippets/clone-native.js — the most durable way to add a button to someone
+// snippets/clone-native.js: the most durable way to add a button to someone
 // else's design system: clone one of theirs and swap its guts.
 //
 // Inherits every utility class, size variant, dark-mode rule and hover state,
 // including whichever layout variant the site happens to be rendering right now.
 
-// 1. Find a template by its VISIBLE TEXT, not by class — text survives redesigns.
+// 1. Find a template by its VISIBLE TEXT, not by class (text survives redesigns).
 //
 // COST: this reads .textContent of every anchor and button on the page, which
 // serializes each one's whole subtree into a string. Never call it from apply()
-// unconditionally — guard on the marker first, so it runs once per DOM
+// unconditionally. Guard on the marker first, so it runs once per DOM
 // generation rather than on every mutation:
 //
 //     if (document.getElementById(MY_ID)) return;   // already built
@@ -31,7 +31,7 @@ function cloneAs(template, { label, href, iconSvg }) {
     oldIcon.replaceWith(iconSvg);
   }
 
-  // Only the first non-empty TEXT node — never innerHTML, which would nuke the icon.
+  // Only the first non-empty TEXT node. innerHTML would nuke the icon.
   for (const node of el.childNodes) {
     if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
       node.textContent = label;
@@ -48,7 +48,7 @@ function cloneAs(template, { label, href, iconSvg }) {
   return el;
 }
 
-// Build SVG this way — innerHTML is rejected on Trusted-Types pages.
+// Build SVG this way. innerHTML is rejected on Trusted-Types pages.
 function icon(viewBox, pathData) {
   const NS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(NS, 'svg');

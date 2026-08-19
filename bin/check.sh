@@ -2,12 +2,12 @@
 # Lint userscripts: metadata completeness, JS syntax, known footguns.
 #
 # Usage: bin/check.sh [file ...]   default: _template.user.js and scripts/*.user.js
-#        (scripts/retired/ is excluded — retired scripts are allowed to be broken)
+#        (scripts/retired/ is excluded, because retired scripts are allowed to be broken)
 #
 # Accept a finding by putting this line anywhere in the script:
-#     // check-ignore: <rule> — why it is fine here
+#     // check-ignore: <rule> why it is fine here
 # The reason is mandatory. An unknown rule name, or an ignore for a rule that
-# never fired, is an error — a suppression that silently does nothing is worse
+# never fired, is an error. A suppression that silently does nothing is worse
 # than no suppression at all.
 set -uo pipefail
 
@@ -27,13 +27,13 @@ warn=0
 
 for f in "${files[@]}"; do
   name=$(basename "$f")
-  msgs=()      # "ERR  text" — always reported
-  finds=()     # "rule|text" — reported unless ignored
+  msgs=()      # "ERR  text" (always reported)
+  finds=()     # "rule|text" (reported unless ignored)
   ignored=()
 
   block=$(sed -n '/==UserScript==/,/==\/UserScript==/p' "$f")
   if [ -z "$block" ]; then
-    printf '\033[31mFAIL\033[0m %s\n      ERR  no ==UserScript== block\n' "$name"; fail=1; continue
+    printf '\033[31mFAIL\033[0m %s\n      ERR  no metadata block. Every script must open with // ==UserScript== and close with // ==/UserScript==\n' "$name"; fail=1; continue
   fi
 
   # --- check-ignore pragmas: one pass, validating name and reason together ---
@@ -44,9 +44,9 @@ for f in "${files[@]}"; do
     fi
     rule="${BASH_REMATCH[1]}"
     reason="${BASH_REMATCH[2]:-}"
-    if [[ ! " ${RULES[*]} " == *" $rule "* ]]; then
+    if [[ " ${RULES[*]} " != *" $rule "* ]]; then
       msgs+=("ERR  check-ignore names unknown rule '$rule' (known: ${RULES[*]})")
-    elif [ -z "${reason// /}" ]; then
+    elif [ -z "$reason" ]; then
       msgs+=("ERR  check-ignore: $rule has no reason")
     else
       ignored+=("$rule")
@@ -55,7 +55,7 @@ for f in "${files[@]}"; do
 
   # --- metadata ---
   for key in "${REQUIRED[@]}"; do
-    grep -qE "^// @$key[[:space:]]" <<<"$block" || msgs+=("ERR  missing @$key")
+    grep -qE "^// @$key[[:space:]]" <<<"$block" || msgs+=("ERR  the @$key metadata field is required")
   done
 
   ver=$(grep -E '^// @version' <<<"$block" | awk '{print $3}')
@@ -63,10 +63,10 @@ for f in "${files[@]}"; do
     finds+=("semver|@version '$ver' is not semver")
 
   grep -qE '^// @match[[:space:]]+https?://\*' <<<"$block" &&
-    finds+=("wildcard-match|@match starts with a wildcard host — narrow it")
+    finds+=("wildcard-match|@match starts with a wildcard host. Narrow it to the paths you need")
 
   grep -qE '^// @icon[[:space:]]' <<<"$block" ||
-    finds+=("icon|no @icon — the script is unidentifiable in the Tampermonkey list")
+    finds+=("icon|no @icon. The script is unidentifiable in the Tampermonkey list")
 
   # --- body ---
   # Comments stripped, so prose *about* a footgun is not read as one. The @grant
@@ -83,23 +83,28 @@ for f in "${files[@]}"; do
     finds+=("prompt|alert/confirm/prompt blocks the page and freezes browser automation")
 
   grep -q 'requestAnimationFrame' <<<"$body" &&
-    finds+=("raf|requestAnimationFrame does not fire in a background tab — debounce with setTimeout")
+    finds+=("raf|requestAnimationFrame does not fire in a background tab. Debounce with setTimeout")
 
   grep -qE 'observe\((document\.)?body' <<<"$body" && grep -q '@run-at *document-start' <<<"$block" &&
     finds+=("body-start|observes document.body at document-start, where body may still be null")
 
-  node --check "$f" 2>/dev/null || msgs+=("ERR  JavaScript syntax error")
+  # node prints "<file>:<line>" then the offending source, then the reason.
+  syntax=$(node --check "$f" 2>&1) ||
+    msgs+=("ERR  $(grep -m1 -E '^[A-Za-z]*Error' <<<"$syntax") at $(head -1 <<<"$syntax")")
 
   # --- apply ignores, then report ignores that matched nothing ---
+  # bash 3.2 expands an empty array under `set -u` only with the ${a[@]+...} guard.
+  set -- ${ignored[@]+"${ignored[@]}"}
   fired=" "
   for find in "${finds[@]}"; do
     rule="${find%%|*}"
     fired+="$rule "
-    [[ " ${ignored[*]-} " == *" $rule "* ]] ||
-      msgs+=("WARN [$rule] ${find#*|} — or: // check-ignore: $rule — <reason>")
+    [[ " $* " == *" $rule "* ]] ||
+      msgs+=("WARN [$rule] ${find#*|}. To accept it: // check-ignore: $rule <reason>")
   done
-  for rule in ${ignored[@]+"${ignored[@]}"}; do
-    [[ "$fired" == *" $rule "* ]] || msgs+=("ERR  check-ignore: $rule is dead — that rule does not fire here")
+  for rule in "$@"; do
+    [[ "$fired" == *" $rule "* ]] ||
+      msgs+=("ERR  check-ignore names rule '$rule', which does not fire in this file. Remove the pragma")
   done
 
   # --- report ---

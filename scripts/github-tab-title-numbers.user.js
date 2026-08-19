@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         GitHub Issue/PR/Run Number in Tab Title
 // @namespace    https://github.com/
-// @version      1.2.1
-// @description  Prefixes the tab/document title with the issue/PR/discussion number, or for Actions run pages, the originating PR number when present (falling back to the workflow run number "#NNNN"). Survives Turbo soft navigations and history.pushState navigations, with a guard against feedback loops.
+// @version      1.2.2
+// @description  Prefixes the tab title with the issue/PR/discussion number, or on Actions run pages the originating PR number
 // @author       Franco Gilio
 // @match        https://github.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
@@ -12,43 +12,35 @@
 
 (function () {
     'use strict';
-    // check-ignore: body-start — watchBody() null-checks document.body and is only
+    // check-ignore: body-start watchBody() null-checks document.body and is only
     // called from boot(), which itself waits for <head> and <title> to exist.
 
-    // Issue/PR/discussion number comes straight from the URL path — authoritative.
-    //   /owner/repo/pull/374  -> 374    /owner/repo/issues/123 -> 123    /owner/repo/discussions/12 -> 12
+    // The issue/PR/discussion number comes straight from the URL path.
     const NUM_RE = /\/(?:pull|issues|discussions)\/(\d+)(?:[/?#]|$)/;
-    // NEW: detect Actions run pages. The run *id* in the URL is NOT the number
-    // we want to show (it's a long opaque id), so we only use this to know we're
-    // on a run page; the actual label is scraped from the DOM by runLabel().
-    const RUN_RE = /\/actions\/runs\/(\d+)(?:[/?#]|$)/;
+    // The run id in the URL is a long opaque id, so this only detects the route.
+    // runLabel() reads the number that is actually displayed.
+    const RUN_RE = /\/actions\/runs\/\d+(?:[/?#]|$)/;
 
     function currentNumber() {
         const m = location.pathname.match(NUM_RE);
         return m ? m[1] : null;
     }
 
-    // NEW: On an Actions run page, prefer the originating PR (only present for
-    // pull_request-triggered runs) and otherwise fall back to the run number
-    // ("#1861") shown next to the run heading. Returns null until the relevant
-    // DOM is hydrated, so callers must re-run on mutations (we already do).
+    // On a run page, prefer the originating PR (present only for pull_request-triggered
+    // runs) and fall back to the run number shown next to the heading. Null until the DOM
+    // hydrates, so callers re-run on mutations.
     function runLabel() {
         if (!RUN_RE.test(location.pathname)) return null;
 
-        // 1) Originating PR, if GitHub rendered a link to it. Scope to <main> to
-        //    avoid matching unrelated PR links elsewhere on the chrome.
-        const main = document.querySelector('main') || document;
+        // Scoped to <main> so PR links elsewhere in the page chrome cannot match.
+        const main = document.querySelector('main') ?? document;
         const prLink = main.querySelector('a[href*="/pull/"]');
-        if (prLink) {
-            const m = prLink.getAttribute('href').match(/\/pull\/(\d+)/);
-            if (m) return '#' + m[1];
-        }
+        const pr = prLink?.pathname.match(/\/pull\/(\d+)/);
+        if (pr) return `#${pr[1]}`;
 
-        // 2) Fallback: the run number span in the run heading. GitHub renders it
-        //    as a muted span (e.g. "#1861") inside the .markdown-title heading.
         for (const el of main.querySelectorAll('.markdown-title .color-fg-muted, h1 .color-fg-muted')) {
-            const t = (el.textContent || '').trim();
-            if (/^#\d+$/.test(t)) return t; // already includes the leading '#'
+            const text = el.textContent.trim();
+            if (/^#\d+$/.test(text)) return text;
         }
         return null;
     }
@@ -56,19 +48,13 @@
     let selfWrite = false;
 
     function apply() {
-        // NEW: compute the desired "#N" prefix from whichever route we're on.
-        let prefix = null;
         const num = currentNumber();
-        if (num) {
-            prefix = `#${num} - `;
-        } else {
-            const label = runLabel(); // already "#NNNN" or null
-            if (label) prefix = `${label} - `;
-        }
-        if (!prefix) return;
+        const label = num ? `#${num}` : runLabel();
+        if (!label) return;
+        const prefix = `${label} - `;
 
         const title = document.title;
-        if (title.startsWith(prefix)) return; // already correct
+        if (title.startsWith(prefix)) return;
 
         // Strip any stale "#NNN - " prefix left over from a previous page.
         const stripped = title.replace(/^#\d+ - /, '');
@@ -81,7 +67,7 @@
     let titleObserver = null;
     function watchTitle() {
         if (titleObserver) return;
-        const head = document.head || document.querySelector('head');
+        const head = document.head;
         if (!head) return;
         titleObserver = new MutationObserver(() => {
             if (selfWrite) return;
@@ -90,10 +76,8 @@
         titleObserver.observe(head, { childList: true, characterData: true, subtree: true });
     }
 
-    // NEW: On run pages the PR link / run-number span hydrate *after* the title,
-    // and never touch <head> — so the head observer alone won't re-fire apply()
-    // once they appear. Watch <body> for the run label to show up. Cheap because
-    // apply() early-returns once the title is correct, and we disconnect on nav.
+    // The PR link and run-number span hydrate after the title and never touch <head>,
+    // so the head observer alone never re-fires apply() once they appear.
     let bodyObserver = null;
     function watchBody() {
         if (!RUN_RE.test(location.pathname)) {
@@ -110,14 +94,14 @@
     function boot() {
         apply();
         watchTitle();
-        watchBody(); // NEW
+        watchBody();
     }
 
-    if (document.head && document.querySelector('title')) {
+    if (document.head?.querySelector('title')) {
         boot();
     } else {
         const headObserver = new MutationObserver(() => {
-            if (document.head && document.querySelector('title')) {
+            if (document.head?.querySelector('title')) {
                 headObserver.disconnect();
                 boot();
             }
@@ -125,10 +109,9 @@
         headObserver.observe(document.documentElement, { childList: true, subtree: true });
     }
 
-    // --- Navigation handling -------------------------------------------------
     function onUrlMaybeChanged() {
         watchTitle();
-        watchBody(); // NEW: (re)arm or tear down the body observer per route
+        watchBody();
         apply();
     }
 

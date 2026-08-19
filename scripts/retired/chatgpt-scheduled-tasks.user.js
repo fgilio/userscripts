@@ -1,4 +1,4 @@
-// RETIRED 2026-08-19 — do not reinstall.
+// RETIRED 2026-08-19. Do not reinstall.
 //
 // Two independent reasons, both verified live on chatgpt.com:
 //   1. Obsolete. ChatGPT now ships its own "Scheduled" item in the sidebar nav,

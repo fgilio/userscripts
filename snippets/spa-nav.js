@@ -1,4 +1,4 @@
-// snippets/spa-nav.js — copy into a script, do not @require.
+// snippets/spa-nav.js: copy into a script, do not @require.
 //
 // Re-runs apply() on every way a modern SPA can change what is on screen.
 // Covers: async hydration, GitHub React soft-nav, Turbo, Turbo frames, pjax,
@@ -24,7 +24,7 @@ function schedule() {
 
 // documentElement, not body: at @run-at document-start there is no body yet.
 // childList ONLY. Adding characterData or attributes turns near-zero records
-// into thousands per second on a busy page — GitHub's ticking workflow timers
+// into thousands per second on a busy page. GitHub's ticking workflow timers
 // and aria-live churn are exactly those two kinds of mutation.
 new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
 
@@ -35,7 +35,7 @@ for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-
 }
 window.addEventListener('popstate', schedule);
 
-// CONDITIONAL — include this only when the script's output derives from the URL
+// CONDITIONAL. Include this only when the script's output derives from the URL
 // rather than from the DOM. A DOM-driven script already sees the change through
 // the observer above; patching two global host methods buys it nothing.
 // Of the scripts in this repo, only github-tab-title-numbers needs it.

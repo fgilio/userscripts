@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Actions — CI + default branch pin
 // @namespace    https://github.com/fgilio
-// @version      1.1.0
+// @version      1.2.0
 // @description  Pins a "CI+main" filter at the top of the GitHub Actions sidebar: one click to the CI workflow runs on the repository default branch.
 // @author       Franco Gilio
 // @icon         https://github.githubassets.com/favicons/favicon.svg
@@ -34,14 +34,14 @@
   const inFlight = new Set();
 
   // snippets/warn-once.js. Without it, a Primer markup change presents as "the
-  // pin just stopped appearing"; with it, the console names the selector.
+  // pin stopped appearing". With it, the console names the selector.
   const warned = new Set();
   function need(root, selector, what) {
     const el = root.querySelector(selector);
     if (el) { warned.delete(selector); return el; }
     if (!warned.has(selector)) {
       warned.add(selector);
-      console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup probably changed — re-inspect the DOM and update the script.`);
+      console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup changed. Update the selector in this script.`);
     }
     return null;
   }
@@ -187,7 +187,7 @@
     }
 
     // The sidebar is absent for a moment on every navigation, so only report it
-    // once <nav-list> itself exists — by then a miss is a real markup change.
+    // once <nav-list> itself exists, by which point a miss is a real markup change.
     const list = document.querySelector(SIDEBAR_LIST);
     if (!list) {
       if (document.querySelector('nav-list')) need(document, SIDEBAR_LIST, 'Actions sidebar list');
@@ -215,14 +215,13 @@
     const label = pin.querySelector('.ActionListItem-label');
     const text = `${workflow.textContent.trim()}+${branch}`;
 
-    link.setAttribute('href', href);
-    link.setAttribute('aria-label', text);
-    // Guarded, unlike the attributes above: assigning textContent replaces a
-    // child node, which the childList observer sees — re-entering render() forever.
-    if (label.textContent !== text) label.textContent = text;
+    link.href = href;
+    link.ariaLabel = text;
+    link.ariaCurrent = isCurrent ? 'page' : null;
     pin.classList.toggle('ActionListItem--navActive', isCurrent);
-    if (isCurrent) link.setAttribute('aria-current', 'page');
-    else link.removeAttribute('aria-current');
+    // Guarded, unlike the writes above: assigning textContent replaces a child
+    // node, which the childList observer sees, re-entering render() forever.
+    if (label.textContent !== text) label.textContent = text;
 
     // The pin and the workflow entry point at the same view, so only one of them is current.
     const workflowItem = workflow.closest('li.ActionListItem');
@@ -235,7 +234,7 @@
   }
 
   let scheduled = false;
-  // setTimeout, not rAF — see CLAUDE.md "SPA navigation".
+  // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
   function schedule() {
     if (scheduled) return;
     scheduled = true;

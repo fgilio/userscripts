@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Sidebar Toggle with Hyper Key
 // @namespace    http://tampermonkey.net/
-// @version      3.7.1
+// @version      3.8.0
 // @description  Toggle sidebar on multiple sites with macOS hyper key (Cmd+Shift+Ctrl+Option+S)
 // @author       Franco Gilio
 // @match        https://gitlab.com/*
@@ -21,35 +21,15 @@
 (function() {
     'use strict';
 
-    // check-ignore: icon — spans 10 sites, no single favicon represents it.
+    // check-ignore: icon spans 10 sites, no single favicon represents it.
 
-    // ============================================================================
-    // FRAME CHECK
-    // ============================================================================
-    // Some sites (like Google Docs) have multiple iframes. Only run in top frame
-    // to avoid duplicate handlers and ensure we're in the right context.
-    //
-    const FRAME_CHECK = {
-        'docs.google.com': true  // Only run in top frame for Google Docs
-    };
+    const TAG = '[sidebar-toggle]';
+    const currentHost = location.hostname;
 
-    const currentHost = window.location.hostname;
-    let needsFrameCheck = false;
-    for (const host in FRAME_CHECK) {
-        if (currentHost.includes(host)) {
-            needsFrameCheck = FRAME_CHECK[host];
-            break;
-        }
-    }
+    // Google Docs renders the sidebar inside several iframes, so one handler per
+    // frame would fire the toggle once per frame.
+    if (currentHost === 'docs.google.com' && window !== window.top) return;
 
-    if (needsFrameCheck && window !== window.top) {
-        console.log('Universal Sidebar Toggle: Skipping iframe on', currentHost);
-        return;
-    }
-
-    // ============================================================================
-    // SITE CONFIGURATION
-    // ============================================================================
     const SITE_CONFIG = {
         'gitlab.com': {
             selectors: ['[data-testid="super-sidebar-collapse-button"]']
@@ -108,11 +88,8 @@
             selectors: ['[data-testid="classic-sidebar-nav-trigger"]']
         },
 
-        // Google Docs: Complex setup with Closure Library
-        // - Two different elements for open/closed states
-        // - Parent has pointer-events:none but children override
-        // - Needs full mouse event sequence
-        // - Aggressive keyboard capture requires capture phase listener
+        // Closure Library: separate elements for open and closed, a parent with
+        // pointer-events:none that children override, and aggressive key capture.
         'docs.google.com': {
             selectors: [
                 '.navigation-widget-hat-close-floating-navigation-button',
@@ -120,30 +97,13 @@
             ],
             skipVisibilityCheck: true,
             useMouseEvents: true,
-            useCapturePhase: true  // Use capture phase for keyboard events
+            useCapturePhase: true
         }
     };
 
-    // ============================================================================
-    // INITIALIZATION
-    // ============================================================================
-    let config = null;
+    const config = SITE_CONFIG[currentHost];
+    if (!config) return;
 
-    for (const host in SITE_CONFIG) {
-        if (currentHost.includes(host)) {
-            config = SITE_CONFIG[host];
-            break;
-        }
-    }
-
-    if (!config) {
-        console.log('Universal Sidebar Toggle: No configuration for', currentHost);
-        return;
-    }
-
-    // ============================================================================
-    // VISIBILITY DETECTION
-    // ============================================================================
     function isElementVisible(element) {
         const rect = element.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) return false;
@@ -162,39 +122,23 @@
         return true;
     }
 
-    // ============================================================================
-    // BUTTON DISCOVERY
-    // ============================================================================
     function findToggleButton() {
         for (const selector of config.selectors) {
             const button = document.querySelector(selector);
-            if (button) {
-                if (config.skipVisibilityCheck) {
-                    const rect = button.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                        console.log('Found button (skipping full visibility check):', selector);
-                        return button;
-                    }
-                    console.log('Checking selector:', selector, 'found:', true, 'has dimensions:', false);
-                    continue;
-                }
-
-                const visible = isElementVisible(button);
-                console.log('Checking selector:', selector, 'found:', true, 'visible:', visible);
-                if (visible) return button;
-            } else {
-                console.log('Checking selector:', selector, 'found:', false);
+            if (!button) continue;
+            if (config.skipVisibilityCheck) {
+                const rect = button.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) return button;
+                continue;
             }
+            if (isElementVisible(button)) return button;
         }
         return null;
     }
 
-    // ============================================================================
-    // CLICK SIMULATION
-    // ============================================================================
     function clickButton(button) {
         if (config.useMouseEvents) {
-            // Full mouse event sequence for Closure Library / Google apps
+            // Closure Library ignores a bare click().
             const events = ['mouseenter', 'mouseover', 'mousedown', 'mouseup', 'click'];
             events.forEach(type => {
                 const event = new MouseEvent(type, {
@@ -235,32 +179,21 @@
         }
     }
 
-    // ============================================================================
-    // KEYBOARD SHORTCUT HANDLER
-    // ============================================================================
     function handleKeyDown(event) {
-        if (event.metaKey && event.shiftKey && event.ctrlKey && event.altKey && event.code === 'KeyS') {
-            // Stop event immediately to prevent Google Docs from capturing it
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation();
+        if (!(event.metaKey && event.shiftKey && event.ctrlKey && event.altKey && event.code === 'KeyS')) return;
 
-            console.log('Hyper+S detected, finding toggle button...');
+        // Google Docs claims this chord on the document, so stop it here.
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
 
-            const toggleButton = findToggleButton();
-
-            if (toggleButton) {
-                console.log('Toggling sidebar');
-                clickButton(toggleButton);
-            } else {
-                console.warn('Universal Sidebar Toggle: Button not found on', currentHost);
-            }
+        const toggleButton = findToggleButton();
+        if (!toggleButton) {
+            console.warn(`${TAG} No sidebar toggle on ${currentHost}. Tried: ${config.selectors.join(', ')}`);
+            return;
         }
+        clickButton(toggleButton);
     }
 
-    // Use capture phase for sites that aggressively capture keyboard events
-    const useCapture = config.useCapturePhase || false;
-    document.addEventListener('keydown', handleKeyDown, useCapture);
-
-    console.log('Universal Sidebar Toggle: Active on', currentHost, useCapture ? '(capture phase)' : '');
+    document.addEventListener('keydown', handleKeyDown, config.useCapturePhase);
 })();

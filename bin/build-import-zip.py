@@ -3,9 +3,9 @@
 
     bin/build-import-zip.py            -> dist/userscripts-import.zip
 
-Load it with Tampermonkey -> Utilities -> Import from file. The import merges
-rather than wipes; the matching rules are documented once in README.md under
-"Syncing the repo into Tampermonkey".
+Load it with Tampermonkey -> Utilities -> Import from file. The import merges rather
+than wipes. README.md documents the matching rules under "Syncing the repo into
+Tampermonkey".
 
 Operationally: a script ships with its options.json when backup/ has one (so its
 uuid, enabled state and sidebar position survive), and source-only otherwise
@@ -29,7 +29,7 @@ NAME_RE = re.compile(r'^// @name[ \t]+(.+?)[ \t]*$', re.M)
 
 
 def meta_name(source):
-    """@name from the metadata block only — never from a stray body comment."""
+    """@name from the metadata block only, never from a stray body comment."""
     block, _, _ = source.partition('// ==/UserScript==')
     m = NAME_RE.search(block)
     return m.group(1) if m else None
@@ -38,15 +38,16 @@ def meta_name(source):
 def main():
     os.chdir(REPO)
 
-    if subprocess.run(['bin/check.sh'], stdout=subprocess.DEVNULL).returncode:
-        sys.exit('refusing to build: bin/check.sh reports errors (run it to see them)')
+    lint = subprocess.run(['bin/check.sh'], capture_output=True, text=True)
+    if lint.returncode:
+        sys.exit(f'refusing to build, bin/check.sh reports errors:\n{lint.stdout}{lint.stderr}')
 
     backups = sorted(glob.glob('backup/tampermonkey-export-*'))
     backup = backups[-1] if backups else None
     if not backup:
         print('note: no backup/tampermonkey-export-* found (it is gitignored, so a fresh\n'
               '      clone has none). Every script will ship source-only and be matched by\n'
-              '      @name + @namespace — enabled state and sidebar position will not be\n'
+              '      @name + @namespace. Enabled state and sidebar position will not be\n'
               '      restored. Export from Tampermonkey into backup/ to regain that.\n')
 
     # meta.name (verbatim, may contain '/') -> options.json path
@@ -97,7 +98,7 @@ def main():
                          + (f', {stored} stored key(s)' if stored else '')))
 
     if not rows:
-        sys.exit('no scripts found in scripts/')
+        sys.exit('no scripts found. Expected at least one file matching scripts/*.user.js')
 
     w = max(len(r[0]) for r in rows)
     print(f'{"script".ljust(w)}  matched by            state  notes')
