@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Laravel Cloud - Collapsible Permission Categories
 // @namespace    https://cloud.laravel.com/
-// @version      1.13.0
+// @version      1.14.0
 // @description  Collapsible permission categories + Select all / Clear with live count (amber at zero), plus a native-matching search box for the Resources list (flush to the list, with native focus ring), in the API token creation modal
 // @author       Franco Gilio
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
@@ -14,9 +14,9 @@
 (function () {
   'use strict';
 
-  const ARROW_ATTR = 'data-collapse-arrow';
-  const TOOLBAR_ATTR = 'data-perm-toolbar';
-  const RES_SEARCH_ATTR = 'data-res-search';
+  const ARROW_ATTR = 'data-fg-collapse-arrow';
+  const TOOLBAR_ATTR = 'data-fg-perm-toolbar';
+  const RES_SEARCH_ATTR = 'data-fg-res-search';
 
   // Native Laravel Cloud tokens (sampled directly from the modal)
   const MUTED = 'color(display-p3 0.379 0.392 0.421)';
@@ -47,9 +47,9 @@
     '<line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
 
   function ensurePlaceholderStyle() {
-    if (document.getElementById('res-search-ph-style')) return;
+    if (document.getElementById('fg-res-search-styles')) return;
     const st = document.createElement('style');
-    st.id = 'res-search-ph-style';
+    st.id = 'fg-res-search-styles';
     st.textContent =
       '[' + RES_SEARCH_ATTR + '] input::placeholder{color:' + PLACEHOLDER + ';opacity:1;}';
     document.head.appendChild(st);
@@ -299,7 +299,7 @@
     listWrapper.style.marginTop = '0px';
   }
 
-  function scan() {
+  function apply() {
     document.querySelectorAll('div').forEach(el => {
       if (looksLikeGroup(el)) enhanceGroup(el);
     });
@@ -309,13 +309,13 @@
 
   // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
   let scheduled = false;
-  function scheduleScan() {
+  function schedule() {
     if (scheduled) return;
     scheduled = true;
-    setTimeout(() => { scheduled = false; scan(); }, 50);
+    setTimeout(() => { scheduled = false; apply(); }, 50);
   }
 
-  const observer = new MutationObserver(scheduleScan);
+  const observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true });
-  scheduleScan();
+  schedule();
 })();

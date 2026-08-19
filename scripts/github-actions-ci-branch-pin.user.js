@@ -178,7 +178,7 @@
     document.getElementById(DIVIDER_ID)?.remove();
   }
 
-  function render() {
+  function apply() {
     const slug = repoSlug();
     if (!slug) {
       removePin();
@@ -202,7 +202,7 @@
     }
 
     const branch = defaultBranch(slug);
-    if (!branch) return; // Still resolving; render once the answer is in rather than guess.
+    if (!branch) return; // Still resolving. Render once the answer is in rather than guess.
 
     const href = `${workflow.pathname}?query=${encodeURIComponent(`branch:${branch}`)}`;
     const query = new URLSearchParams(location.search).get('query')?.trim();
@@ -219,7 +219,7 @@
     link.ariaCurrent = isCurrent ? 'page' : null;
     pin.classList.toggle('ActionListItem--navActive', isCurrent);
     // Guarded, unlike the writes above: assigning textContent replaces a child
-    // node, which the childList observer sees, re-entering render() forever.
+    // node, which the childList observer sees, re-entering apply() forever.
     if (label.textContent !== text) label.textContent = text;
 
     // The pin and the workflow entry point at the same view, so only one of them is current.
@@ -240,9 +240,9 @@
     setTimeout(() => {
       scheduled = false;
       try {
-        render();
+        apply();
       } catch (error) {
-        console.error(`${TAG} render failed`, error);
+        console.error(`${TAG} apply failed`, error);
       }
     }, 50);
   }
@@ -255,7 +255,7 @@
   new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
   // 'soft-nav:end' is GitHub's React router, which drives the Actions pages and
   // fires nothing else; the rest cover the Turbo/pjax pages GitHub still serves.
-  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
+  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:apply', 'turbo:frame-apply', 'pjax:end']) {
     document.addEventListener(event, schedule);
   }
   window.addEventListener('popstate', schedule);

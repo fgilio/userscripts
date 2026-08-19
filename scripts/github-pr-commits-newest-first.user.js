@@ -12,59 +12,59 @@
 // ==/UserScript==
 
 (function () {
-    'use strict';
+  'use strict';
 
-    const TAG = '[pr-commits]';
-    const TIMELINE = 'div.prc-Timeline-Timeline-awSoC';
-    const COMMIT_UL = 'ul.ListView-module__ul__uMK30';
+  const TAG = '[pr-commits]';
+  const TIMELINE = 'div.prc-Timeline-Timeline-awSoC';
+  const COMMIT_UL = 'ul.ListView-module__ul__uMK30';
 
-    const warned = new Set();
-    function need(root, selector, what) {
-        const el = root.querySelector(selector);
-        if (el) {
-            warned.delete(selector);
-            return el;
-        }
-        if (!warned.has(selector)) {
-            warned.add(selector);
-            console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup changed. Update the selector in this script.`);
-        }
-        return null;
+  const warned = new Set();
+  function need(root, selector, what) {
+    const el = root.querySelector(selector);
+    if (el) {
+      warned.delete(selector);
+      return el;
     }
-
-    function isOnCommitsTab() {
-        return /\/pull\/\d+\/commits(?:[/?#]|$)/.test(location.pathname);
+    if (!warned.has(selector)) {
+      warned.add(selector);
+      console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup changed. Update the selector in this script.`);
     }
+    return null;
+  }
 
-    function reverseCommits() {
-        if (!isOnCommitsTab()) return;
+  function isOnCommitsTab() {
+    return /\/pull\/\d+\/commits(?:[/?#]|$)/.test(location.pathname);
+  }
 
-        const timeline = need(document, TIMELINE, 'Timeline container');
-        if (!timeline || timeline.dataset.reversed === '1') return;
-        if (!need(timeline, COMMIT_UL, 'Commit list')) return;
+  function apply() {
+    if (!isOnCommitsTab()) return;
 
-        for (const ul of timeline.querySelectorAll(COMMIT_UL)) {
-            ul.append(...[...ul.children].reverse());
-        }
-        timeline.append(...[...timeline.children].reverse());
-        timeline.dataset.reversed = '1';
+    const timeline = need(document, TIMELINE, 'Timeline container');
+    if (!timeline || timeline.dataset.fgReversed === '1') return;
+    if (!need(timeline, COMMIT_UL, 'Commit list')) return;
+
+    for (const ul of timeline.querySelectorAll(COMMIT_UL)) {
+      ul.append(...[...ul.children].reverse());
     }
+    timeline.append(...[...timeline.children].reverse());
+    timeline.dataset.fgReversed = '1';
+  }
 
-    // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
-    let scheduled = false;
-    function schedule() {
-        if (scheduled) return;
-        scheduled = true;
-        setTimeout(() => {
-            scheduled = false;
-            try { reverseCommits(); } catch (error) { console.error(TAG, error); }
-        }, 50);
-    }
+  // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
+  let scheduled = false;
+  function schedule() {
+    if (scheduled) return;
+    scheduled = true;
+    setTimeout(() => {
+      scheduled = false;
+      try { apply(); } catch (error) { console.error(TAG, error); }
+    }, 50);
+  }
 
-    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
-    for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
-        document.addEventListener(event, schedule);
-    }
-    window.addEventListener('popstate', schedule);
-    schedule();
+  new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
+    document.addEventListener(event, schedule);
+  }
+  window.addEventListener('popstate', schedule);
+  schedule();
 })();
