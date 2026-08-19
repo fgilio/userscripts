@@ -1,0 +1,11 @@
+# Tampermonkey exports contain GM_setValue data — for laravel-cloud-nightwatch-linker
+# that is internal publica.la environment UUIDs. Local snapshot only, never pushed.
+backup/
+
+# Build output of bin/build-import-zip.py
+dist/
+
+.DS_Store
+
+# bin/build-import-zip.py is run directly, never imported
+bin/__pycache__/
