@@ -6,7 +6,7 @@ Tampermonkey userscripts for Chrome. One file per script in `scripts/`, self-con
 
 ```
 scripts/      one <kebab-name>.user.js per script (the only source of truth)
-snippets/     canonical code to COPY-PASTE into a new script (not @require'd)
+snippets/     reference patterns to copy from (see snippets/README.md, not canon)
 bin/          check.sh (lint), build-import-zip.py (repo -> importable zip), install.sh
 backup/       raw Tampermonkey export: .options.json + .storage.json (gitignored)
 _template.user.js   start here for a new script
@@ -56,7 +56,7 @@ Start
 │   ├── const TAG = '[script-name]'   for every console call
 │   ├── Route guard   : regex on location.pathname, anchored, escaped
 │   ├── apply()       : idempotent, early-return when the DOM is not ready
-│   └── boot()        : wire the observer and the nav events (snippets/spa-nav.js)
+│   └── boot()        : wire the observer and the nav events
 └── Test → Install → Record in README.md
 ```
 
@@ -71,7 +71,7 @@ Start
 ### SPA navigation, the single largest source of bugs
 
 GitHub, Laravel Cloud, ChatGPT and friends swap content without a page load. A script that
-runs once is a script that works once. Copy `snippets/spa-nav.js` verbatim. It covers:
+runs once is a script that works once. `_template.user.js` carries the boot block. It covers:
 
 - `MutationObserver` on `document.documentElement` (not `body`, which is null at `document-start`)
 - `soft-nav:end` (GitHub React nav), `turbo:load`, `turbo:render`, `turbo:frame-render`, `pjax:end`
@@ -83,9 +83,9 @@ cmd-clicked link is a background tab. It is also cheaper in the foreground: a 50
 caps the callback at 20 Hz where rAF ran it at 60. Reference this paragraph from a script
 rather than restating it. `bin/check.sh` enforces it (rule `raf`).
 
-The `history.pushState` / `replaceState` patch in `snippets/spa-nav.js` is **conditional**:
-include it only when the script's output derives from the URL rather than the DOM. A
-DOM-driven script already sees the change through the observer. Only
+The `history.pushState` / `replaceState` patch at the bottom of `_template.user.js` is
+**conditional**: include it only when the script's output derives from the URL rather than
+the DOM. A DOM-driven script already sees the change through the observer. Only
 `github-tab-title-numbers` needs it.
 
 ### Making injected UI look native

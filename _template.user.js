@@ -65,8 +65,19 @@
     document.addEventListener(event, schedule);
   }
   window.addEventListener('popstate', schedule);
-  // Output derived from the URL rather than the DOM also needs the history patch
-  // in snippets/spa-nav.js.
+
+  // CONDITIONAL. Include this only when the output derives from the URL rather
+  // than the DOM, which the observer already sees. Only github-tab-title-numbers
+  // needs it today.
+  //
+  //   for (const method of ['pushState', 'replaceState']) {
+  //     const original = history[method];
+  //     history[method] = function (...args) {
+  //       const result = original.apply(this, args);
+  //       Promise.resolve().then(schedule);
+  //       return result;
+  //     };
+  //   }
 
   schedule();
 })();

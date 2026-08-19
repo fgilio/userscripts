@@ -33,8 +33,7 @@
 
   const inFlight = new Set();
 
-  // snippets/warn-once.js. Without it, a Primer markup change presents as "the
-  // pin stopped appearing". With it, the console names the selector.
+  // Without this, a Primer markup change presents as "the pin stopped appearing".
   const warned = new Set();
   function need(root, selector, what) {
     const el = root.querySelector(selector);
