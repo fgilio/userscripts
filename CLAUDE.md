@@ -9,7 +9,7 @@ scripts/      one <kebab-name>.user.js per script (the only source of truth)
 snippets/     reference patterns to copy from (see snippets/README.md, not canon)
 bin/          check.sh (lint), build-import-zip.py (repo -> importable zip), install.sh
 backup/       raw Tampermonkey export: .options.json + .storage.json (gitignored)
-_template.user.js   start here for a new script
+_template.user.js   start here for a new script, and the home of the boot block
 ```
 
 ## Golden rules
@@ -162,7 +162,8 @@ editor, so this repo stays authoritative.
 
 ## Checklist before calling a script done
 
-- [ ] `bin/check.sh` passes
+- [ ] `bin/check.sh` passes (it checks @noframes, the TAG const, and that the
+      MutationObserver is wired to `schedule()`)
 - [ ] Runs on hard load, on soft nav into the page, and on soft nav *away and back*
 - [ ] Runs in a background tab (cmd-click the link, then switch to it)
 - [ ] Second run changes nothing (idempotent)

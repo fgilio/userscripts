@@ -11,6 +11,9 @@ bin/build-import-zip.py                   # repo -> dist/userscripts-import.zip 
 bin/install.sh scripts/<name>.user.js     # push one script into Tampermonkey
 ```
 
+`snippets/` holds reference patterns, not canon. The boot block and the warn-once
+helper live in `_template.user.js`, which is the file you copy.
+
 ## Installed
 
 | Script | Sites | What it does |
