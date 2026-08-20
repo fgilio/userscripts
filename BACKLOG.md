@@ -6,9 +6,8 @@ so anything below can be compared against the original.
 
 ## Pending in Tampermonkey (manual, cannot be scripted)
 
-- [ ] Delete `ChatGPT "Scheduled Tasks"` in the dashboard. It is retired and
-      excluded from the zip, so importing never removes it. The source is kept
-      in `scripts/retired/` with the reason.
+- [x] Delete `ChatGPT "Scheduled Tasks"` in the dashboard. Done 2026-08-20. The
+      source is kept in `scripts/retired/` with the reason.
 - [ ] Re-export into `backup/tampermonkey-export-<date>/` after pairing any new
       Cloud/Nightwatch environment. The import replaces `GM_setValue` storage
       rather than merging it, so a stale snapshot silently drops new pairings.
