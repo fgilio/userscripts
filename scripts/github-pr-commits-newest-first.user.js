@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub PR Commits — Newest First
 // @namespace    https://github.com/
-// @version      1.3.1
+// @version      1.4.0
 // @description  Reverse the PR Commits tab so newest commits (and newest day) appear on top
 // @author       Franco Gilio
 // @match        https://github.com/*/*/pull/*
@@ -38,18 +38,42 @@
     return /\/pull\/\d+\/commits(?:[/?#]|$)/.test(location.pathname);
   }
 
+  // Arrival order, stamped once per node. A plain reverse() is only correct the
+  // first time, so the old marker had to retire the script after one run, and a
+  // commit pushed while the tab is open then stayed at the bottom. Sorting on the
+  // stamp instead is correct every run: re-running changes nothing, and a node
+  // that arrives later sorts ahead of everything already stamped.
+  const ORDER = 'fgOrder';
+
+  /** Returns true when the DOM had to move. */
+  function newestFirst(container) {
+    const children = [...container.children];
+    if (!children.length) return false;
+
+    let next = children.reduce(
+      (highest, child) => Math.max(highest, Number(child.dataset[ORDER] ?? -1)), -1) + 1;
+    for (const child of children) {
+      if (child.dataset[ORDER] === undefined) child.dataset[ORDER] = String(next++);
+    }
+
+    const wanted = [...children].sort(
+      (a, b) => Number(b.dataset[ORDER]) - Number(a.dataset[ORDER]));
+    // Touching the DOM unconditionally would retrigger the observer for ever.
+    if (wanted.every((child, i) => child === children[i])) return false;
+
+    for (const child of wanted) container.appendChild(child);
+    return true;
+  }
+
   function apply() {
     if (!isOnCommitsTab()) return;
 
     const timeline = need(document, TIMELINE, 'Timeline container');
-    if (!timeline || timeline.dataset.fgReversed === '1') return;
+    if (!timeline) return;
     if (!need(timeline, COMMIT_UL, 'Commit list')) return;
 
-    for (const ul of timeline.querySelectorAll(COMMIT_UL)) {
-      ul.append(...[...ul.children].reverse());
-    }
-    timeline.append(...[...timeline.children].reverse());
-    timeline.dataset.fgReversed = '1';
+    for (const ul of timeline.querySelectorAll(COMMIT_UL)) newestFirst(ul);
+    newestFirst(timeline);
   }
 
   // setTimeout, not rAF. See CLAUDE.md "SPA navigation".

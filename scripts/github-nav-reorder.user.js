@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Repo & Org Nav Reorder
 // @namespace    https://github.com/
-// @version      3.4.0
+// @version      3.5.0
 // @description  Reorders the repo and org tab navs, flattens the "More" overflow, adds a Releases tab, and hides tab icons without flicker
 // @author       Franco Gilio
 // @match        https://github.com/*
@@ -99,8 +99,12 @@ ${NAV} ${VIS_SEL}:not([data-fg-ready]) { visibility: hidden !important; }
     visible.dataset.fgReady = '1';
   }
 
+  // One timer, re-armed per navigation. Each new nav gets its own grace period,
+  // and reveal() only sets an attribute, so a stray extra run costs nothing.
+  let failsafe = 0;
   function armFailsafe() {
-    setTimeout(() => {
+    clearTimeout(failsafe);
+    failsafe = setTimeout(() => {
       document.querySelectorAll(
         `${REPO_NAV_SEL} ${VIS_SEL}, ${ORG_NAV_SEL} ${VIS_SEL}`
       ).forEach(reveal);
@@ -168,7 +172,10 @@ ${NAV} ${VIS_SEL}:not([data-fg-ready]) { visibility: hidden !important; }
     if (!visible) return;
     const codeLink = visible.querySelector('a[data-tab-item="code"]') ||
             nav.querySelector('a[data-tab-item="code"]');
-    if (!codeLink) return;
+    if (!codeLink) {
+      needIn(nav, 'a[data-tab-item="code"]', 'the Code tab, which the repo base href comes from');
+      return;
+    }
     const repoBase = codeLink.getAttribute('href');
 
     const seen = flattenAndDedupe(nav, visible);
@@ -247,13 +254,16 @@ ${NAV} ${VIS_SEL}:not([data-fg-ready]) { visibility: hidden !important; }
   boot();
 
   // 'soft-nav:end' is GitHub's React router, which drives most of github.com.
-  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
-    document.addEventListener(event, boot);
+  // Every one of these swaps in a fresh nav that the stylesheet hides until
+  // reordered, so each has to re-arm the reveal as well as re-run the work.
+  function navigated() {
+    armFailsafe();
+    boot();
   }
-  window.addEventListener('popstate', boot);
-
-  // A turbo navigation swaps content without a reload, so re-arm the fail-safe.
-  document.addEventListener('turbo:visit', armFailsafe);
+  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end', 'turbo:visit']) {
+    document.addEventListener(event, navigated);
+  }
+  window.addEventListener('popstate', navigated);
 
   // setTimeout, not rAF. See CLAUDE.md "SPA navigation". Here specifically, a
   // cmd-clicked repo would sit on the fail-safe reveal until focused, then jump.

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Laravel Cloud ↔ Nightwatch Linker
 // @namespace    http://tampermonkey.net/
-// @version      3.0.1
+// @version      3.2.0
 // @description  Native-looking links between Laravel Cloud environments and Nightwatch dashboards
 // @author       Franco Gilio
 // @match        https://cloud.laravel.com/*
@@ -108,10 +108,16 @@
     return e || null;
   }
 
+  // Cloud paths are /{org}/{app}/{env}/..., but an app also has pages that sit
+  // where the environment name goes. Two of those, keyed ':settings', reached
+  // storage before this list was shared with recordCloudPath().
+  var NOT_AN_ENV = ['settings', 'deployments', 'commands', 'logs', 'metrics', 'queues'];
+
   function parseCloudUrl() {
     var parts = window.location.pathname.split('/').filter(Boolean);
-    if (parts.length >= 3) return { org: parts[0], app: parts[1], env: parts[2] };
-    return null;
+    if (parts.length < 3) return null;
+    if (NOT_AN_ENV.indexOf(parts[2]) !== -1) return null;
+    return { org: parts[0], app: parts[1], env: parts[2] };
   }
   function parseNightwatchUrl() {
     var path = window.location.pathname;
@@ -172,7 +178,7 @@
     return null;
   }
 
-function buildCloudButton(label, href, onClick) {
+function buildCloudButton(label, href, onClick, builtFor) {
     var template = findVisitButton();
     var el;
     if (template) {
@@ -217,6 +223,7 @@ function buildCloudButton(label, href, onClick) {
     }
 
     el.id = 'fg-nightwatch-link';
+    el.setAttribute('data-fg-for', builtFor);
     el.href = href || '#';
     el.target = href && href !== '#' ? '_blank' : '';
     el.rel = 'noopener';
@@ -229,9 +236,15 @@ function buildCloudButton(label, href, onClick) {
     var info = parseCloudUrl();
     if (!info || !info.app || !info.env) return;
 
-    var skip = ['settings', 'deployments', 'commands', 'logs', 'metrics', 'queues'];
-    if (skip.indexOf(info.env) !== -1) return;
-    if (document.getElementById('fg-nightwatch-link')) return;
+    // Presence is not freshness. Switching environment is a soft nav, and if the
+    // header survives it, a link left in place points at the previous
+    // environment's Nightwatch. That is worse than showing no link.
+    var stamp = generateKey(info.org, info.app, info.env);
+    var mounted = document.getElementById('fg-nightwatch-link');
+    if (mounted) {
+      if (mounted.getAttribute('data-fg-for') === stamp) return;
+      mounted.remove();
+    }
 
     var mappings = getMappings();
     var found = adoptForCloud(mappings, info);
@@ -256,7 +269,7 @@ function buildCloudButton(label, href, onClick) {
     var link;
     if (uuid) {
       var href = 'https://nightwatch.laravel.com/' + region + '/environments/' + uuid + '/dashboard';
-      link = buildCloudButton('Nightwatch', href, null);
+      link = buildCloudButton('Nightwatch', href, null, stamp);
     } else {
       link = buildCloudButton('Link Nightwatch', '#', function (e) {
         e.preventDefault();
@@ -276,14 +289,15 @@ function buildCloudButton(label, href, onClick) {
           saveMappings(mm);
           location.reload();
         }
-      });
+      }, stamp);
     }
     container.insertBefore(link, visitBtn);
   }
 
-  function buildNightwatchButton(label, href, onClick) {
+  function buildNightwatchButton(label, href, onClick, builtFor) {
     var a = document.createElement('a');
     a.id = 'fg-cloud-link';
+    a.setAttribute('data-fg-for', builtFor);
     a.href = href || '#';
     a.target = href && href !== '#' ? '_blank' : '';
     a.rel = 'noopener';
@@ -334,7 +348,11 @@ function buildCloudButton(label, href, onClick) {
       console.warn(TAG, 'no Cloud environment paired with this Nightwatch UUID yet');
     }
 
-    if (document.getElementById('fg-cloud-link')) return;
+    var mountedCloud = document.getElementById('fg-cloud-link');
+    if (mountedCloud) {
+      if (mountedCloud.getAttribute('data-fg-for') === nw.envUuid) return;
+      mountedCloud.remove();
+    }
 
     var aside = document.querySelector('aside');
     if (!aside) return;
@@ -344,7 +362,7 @@ function buildCloudButton(label, href, onClick) {
     var link;
     if (existing.cloudPath) {
       link = buildNightwatchButton('Laravel Cloud',
-        'https://cloud.laravel.com/' + existing.cloudPath, null);
+        'https://cloud.laravel.com/' + existing.cloudPath, null, nw.envUuid);
     } else {
       link = buildNightwatchButton('Link Laravel Cloud', '#', function (e) {
         e.preventDefault();
@@ -367,7 +385,7 @@ function buildCloudButton(label, href, onClick) {
           saveMappings(mm);
           location.reload();
         }
-      });
+      }, nw.envUuid);
     }
 
     if (navList) {

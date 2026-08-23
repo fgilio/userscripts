@@ -16,11 +16,11 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 - **No credential access.** No script reads `document.cookie`, `localStorage`, or
   `sessionStorage`, and none touches a password or token field.
 - **No HTML is ever built from page data.** Two files assign `innerHTML`, three times
-  between them, and the operand is always SVG markup written into the script itself:
-  `laravel-cloud-collapsible-permissions.user.js:83` and `:270` use string constants
-  declared at the top of the file, and `laravel-cloud-nightwatch-linker.user.js:294`
-  calls `cloudIconSvg()`, which concatenates a fixed path with a colour its caller
-  passes as a literal. No page content, URL, or user input
+  between them, and the operand is always SVG markup written into the script itself.
+  In `laravel-cloud-collapsible-permissions` it is the `CHEVRON_SVG` and `SEARCH_SVG`
+  constants declared at the top of the file. In `laravel-cloud-nightwatch-linker` it is
+  `cloudIconSvg()`, which concatenates a fixed path with a colour its caller passes as
+  a literal. Grep `innerHTML` to see all three. No page content, URL, or user input
   reaches an HTML sink anywhere in the repo. The tradeoff is that those three
   assignments would be rejected by a site sending `require-trusted-types-for`. No site
   matched here sends it today, and `CLAUDE.md` records that as the trigger for switching

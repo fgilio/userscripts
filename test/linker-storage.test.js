@@ -110,6 +110,22 @@ check('legacy key without cloudPath is adopted by the org visiting it',
   run({ 'shop:production': { uuid: 'u-3', region: 'us' } }, CLOUD, '/acme/shop/production'),
   { 'acme:shop:production': { uuid: 'u-3', region: 'us', cloudPath: 'acme/shop/production' } });
 
+// --- app pages that sit where the environment name goes -----------------------
+// Two keys ending ':settings' were found in a real export, so this is the shape
+// that leaked rather than one that might.
+check('an app settings page is not recorded as an environment',
+  run({ 'acme:shop:production': { uuid: 'u-1', region: 'us', cloudPath: 'acme/shop/production' } },
+      CLOUD, '/acme/shop/settings'),
+  { 'acme:shop:production': { uuid: 'u-1', region: 'us', cloudPath: 'acme/shop/production' } });
+
+check('nor is a deployment listing under an app',
+  run({}, CLOUD, '/acme/shop/deployments'),
+  {});
+
+check('a real environment under the same app still records',
+  run({}, CLOUD, '/acme/shop/staging'),
+  { 'acme:shop:staging': { cloudPath: 'acme/shop/staging' } });
+
 // --- the collision Codex found ---
 check('two orgs sharing app+env names both survive a Cloud visit',
   run({ 'acme:shop:production':   { uuid: 'u-1', region: 'us', cloudPath: 'acme/shop/production' },
