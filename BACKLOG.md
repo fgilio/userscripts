@@ -4,20 +4,6 @@ Open threads from the style audit of 2026-08-19/20. Nothing here is urgent, and
 the collection works as it stands. Baseline before the audit is commit `82665df`,
 so anything below can be compared against the original.
 
-## Pending in Tampermonkey (manual, cannot be scripted)
-
-- [x] Delete `ChatGPT "Scheduled Tasks"` in the dashboard. Done 2026-08-20. The
-      source is kept in `scripts/retired/` with the reason.
-- [ ] Re-export into `backup/tampermonkey-export-<date>/` after pairing any new
-      Cloud/Nightwatch environment. The import replaces `GM_setValue` storage
-      rather than merging it, so a stale snapshot silently drops new pairings.
-      Mitigated 2026-08-23: updating installed scripts now goes through their raw
-      URLs, which never touch storage, so the zip is only used for a fresh
-      machine. CLAUDE.md *Installing* says so in as many words. The re-export is
-      still worth doing, but it is no longer the thing standing between an update
-      and losing pairings.
-      The 2026-08-19 snapshot holds 57 of them.
-
 ## Declined during the audit, recorded so they are not rediscovered
 
 - **`laravel-cloud-nightwatch-linker` is the only ES5 file** (68 `var`, no arrow
