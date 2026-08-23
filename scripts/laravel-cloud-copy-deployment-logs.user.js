@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         Laravel Cloud Copy Deployment Logs
 // @namespace    https://github.com/fgilio
-// @version      1.0.0
+// @version      1.1.0
 // @description  Adds a copy button to every step and every section of a Laravel Cloud deployment, so a build or deploy log reaches the clipboard as plain text without expanding anything
 // @author       Franco Gilio
-// @match        https://cloud.laravel.com/*/*/*/deployments/*
+// @match        https://cloud.laravel.com/*
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
 // @run-at       document-idle
 // @noframes
@@ -12,6 +12,12 @@
 // @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-copy-deployment-logs.user.js
 // @grant        none
 // ==/UserScript==
+
+// The @match is the whole host rather than the deployment path, because you reach a
+// deployment by clicking a row in the list. That is an Inertia navigation, and
+// Tampermonkey decides whether to inject at document load, so a path-scoped @match
+// leaves the script absent on the one route it exists for. ROUTE below does the
+// narrowing instead, and apply() is a no-op everywhere else.
 
 (function () {
   'use strict';
