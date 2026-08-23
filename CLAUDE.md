@@ -213,6 +213,6 @@ editor, so this repo stays authoritative.
 | Site | Icon URL | Nav events | Notes |
 |---|---|---|---|
 | GitHub | `https://github.githubassets.com/favicons/favicon.svg` | `soft-nav:end` first, then turbo/pjax | Mixed React + Turbo. Primer classes are stable, CSS-module hashes are not |
-| Laravel Cloud | `https://cloud.laravel.com/.../apple-touch-icon.png` | none, observe the body | React + Headless UI. Re-renders on every checkbox toggle, so drive controls one at a time with a ~60 ms gap |
+| Laravel Cloud | `https://cloud.laravel.com/.../apple-touch-icon.png` | none, observe the body | React + Headless UI + Inertia. Re-renders on every checkbox toggle, so drive controls one at a time with a ~60 ms gap. The Inertia payload sits in a `script[type=application/json]` beside the app root and is written once at first paint, so it is stale after any soft nav: re-fetch the current URL and check the payload against it before trusting it |
 | ChatGPT (retired) | `https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com` | none, MutationObserver | Tailwind classes are generated, so clone a sibling |
 | Google Docs | n/a | n/a | Closure Library: needs the full `mouseenter`, `mouseover`, `mousedown`, `mouseup`, `click` sequence, plus a capture-phase key listener |

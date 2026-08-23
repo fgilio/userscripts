@@ -2,7 +2,7 @@
 
 Userscripts run with full access to every page they match, so "trust me" is not good
 enough. This file states exactly what each script in `scripts/` does, so you can verify
-it against the source before installing. Every file is under 350 lines and has no
+it against the source before installing. Every file is a few hundred lines and has no
 dependencies, so reading one end to end is a realistic thing to ask of you.
 
 ## Properties that hold for every script
@@ -20,7 +20,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
   file: `laravel-cloud-collapsible-permissions.user.js:81` and `:268`, and
   `laravel-cloud-nightwatch-linker.user.js:282`. No page content, URL, or user input
   reaches an HTML sink anywhere in the repo. The tradeoff is that those three
-  assignments would be rejected by a site sending `require-trusted-types-for`; no site
+  assignments would be rejected by a site sending `require-trusted-types-for`. No site
   matched here sends it today, and `CLAUDE.md` records that as the trigger for switching
   them to `createElementNS`, which `github-actions-ci-branch-pin` already uses.
 - **Narrow `@match`.** Each script matches the smallest URL pattern that works. No
@@ -38,6 +38,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 | `github-auto-expand-single-check-group` | none | none | Opens check workflow `<details>` elements |
 | `github-pr-checks-signal-first` | none | none | Reorders existing check rows and workflow wrappers, and dims skipped jobs. Adds nothing and clicks nothing |
 | `github-pr-commits-newest-first` | none | none | Reorders existing DOM nodes |
+| `laravel-cloud-copy-deployment-logs` | One same-origin `fetch` of the deployment page you are already on, with `credentials: 'same-origin'` | none | Writes to the clipboard, only when you click a copy control |
 | `laravel-cloud-collapsible-permissions` | none | none | Clicks permission checkboxes on your behalf when you press Select all / Clear |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |
 | `universal-sidebar-toggle` | none | none | Runs in iframes and uses `postMessage` (see below) |
@@ -51,6 +52,19 @@ itself would.
 That is required to resolve a private repo you can see. It extracts one string, the
 branch name, and caches it under `GM_setValue`. Nothing else is read from the response
 and nothing leaves the browser.
+
+### `laravel-cloud-copy-deployment-logs`, the fetch and the clipboard
+
+Laravel Cloud renders a deployment step's log only while that step is expanded, but ships
+the whole log in a JSON script inside the page. That copy is written once at first paint,
+so it goes stale the moment you navigate to another deployment or the running one gains a
+line. So a copy click re-fetches the page currently in the address bar, reads the payload
+out of the response, and refuses it unless the deployment number and commit hash in it
+match the URL. Same origin, your own session cookie, one GET of a page you are looking
+at. Nothing is sent anywhere, and no other URL is ever requested.
+
+The clipboard is written with `navigator.clipboard.write`, never read. The write happens
+only inside a click or Enter handler on one of the injected controls.
 
 ### `universal-sidebar-toggle`, frames and `postMessage`
 

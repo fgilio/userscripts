@@ -8,9 +8,10 @@ modal with no "select all". Two dashboards that clearly know about each other an
 don't link to each other. A sidebar with a keyboard shortcut on one site and nothing on
 the next nine. None of it is hard to fix, which is the annoying part.
 
-Five of these are GitHub, two are Laravel Cloud, and one is a single sidebar toggle that
-behaves the same way across ten sites that each hide their sidebar behind a different
-button. They're built for my habits, so treat the list as a menu rather than a suite.
+Five of these are GitHub, three are Laravel Cloud, and one is a single sidebar toggle
+that behaves the same way across ten sites that each hide their sidebar behind a
+different button. They're built for my habits, so treat the list as a menu rather than a
+suite.
 
 ## Install
 
@@ -46,6 +47,7 @@ Changing anything locally, or want the whole set at once? See
 | [`github-pr-checks-signal-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-checks-signal-first.user.js) | `github.com/*/*/pull/*` | On the PR Checks tab, floats whatever needs attention to the top: workflows are ordered by their worst job, jobs by their own status, and skipped jobs sink to the bottom dimmed. A single failure buried at row 16 of 17 ends up first |
 | [`github-pr-commits-newest-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-commits-newest-first.user.js) | `github.com/*/*/pull/*` | Reverses the PR Commits tab so the newest commit and newest day are on top |
 | [`laravel-cloud-nightwatch-linker`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-nightwatch-linker.user.js) | `cloud.laravel.com`, `nightwatch.laravel.com` | Native-looking cross-links between a Laravel Cloud environment and its Nightwatch dashboard. Learns the pairing once, then remembers it |
+| [`laravel-cloud-copy-deployment-logs`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-copy-deployment-logs.user.js) | `cloud.laravel.com/*/*/*/deployments/*` | A copy button on every deployment step and on each of the two log sections. Copies the log as plain text without expanding anything, including the technical failure cause the page never shows |
 | [`laravel-cloud-collapsible-permissions`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-collapsible-permissions.user.js) | `cloud.laravel.com/*` | API token modal: collapsible permission categories, Select all / Clear with a live count, and a search box over the Resources list |
 | [`universal-sidebar-toggle`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/universal-sidebar-toggle.user.js) | 10 sites | Hyper+S (⌘⇧⌃⌥S) toggles the sidebar. Per-site selector config. Handles Closure Library and pointer-event quirks |
 
@@ -68,6 +70,7 @@ the observer simply runs again).
 | `github-nav-reorder` | high | `ul.prc-components-UnderlineItemList-xKlKC`, `ul.prc-ActionList-ActionList-rPFF2`, both hashed. Fails safe: the nav reveals itself unreordered after 1.5 s |
 | `laravel-cloud-collapsible-permissions` | medium | Structural heuristics ("a div whose 2 children look like a header and a checkbox list") plus literal `color(display-p3 ...)` tokens sampled from the live page |
 | `laravel-cloud-nightwatch-linker` | medium | Finds its mount point by the button text "Visit" and by `aside button[role=combobox]` |
+| `laravel-cloud-copy-deployment-logs` | medium | Reads the deployment payload out of the page's own JSON script, keyed on `deploymentBuildSteps` / `deploymentDeploySteps`. Mounts on `div.sticky.justify-between` and `button.group/inner`. Degrades to copying the expanded log when the payload stops making sense |
 | `universal-sidebar-toggle` | low | Per-site `data-testid` / `aria-label` selectors, several per site as fallbacks |
 | `github-actions-ci-branch-pin` | low | Primer classes (`ActionListItem`) are stable. Also parses `"defaultBranch"` out of the repo home page, with the refs endpoint as fallback |
 | `github-auto-expand-single-check-group` | low | `details.checks-list-item` |
