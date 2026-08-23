@@ -15,10 +15,12 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
   analytics, no error reporting, and no phone-home of any kind.
 - **No credential access.** No script reads `document.cookie`, `localStorage`, or
   `sessionStorage`, and none touches a password or token field.
-- **No HTML is ever built from page data.** Three scripts assign `innerHTML`, and in
-  every case the operand is a hardcoded SVG string constant declared at the top of the
-  file: `laravel-cloud-collapsible-permissions.user.js:81` and `:268`, and
-  `laravel-cloud-nightwatch-linker.user.js:282`. No page content, URL, or user input
+- **No HTML is ever built from page data.** Two files assign `innerHTML`, three times
+  between them, and the operand is always SVG markup written into the script itself:
+  `laravel-cloud-collapsible-permissions.user.js:83` and `:270` use string constants
+  declared at the top of the file, and `laravel-cloud-nightwatch-linker.user.js:294`
+  calls `cloudIconSvg()`, which concatenates a fixed path with a colour its caller
+  passes as a literal. No page content, URL, or user input
   reaches an HTML sink anywhere in the repo. The tradeoff is that those three
   assignments would be rejected by a site sending `require-trusted-types-for`. No site
   matched here sends it today, and `CLAUDE.md` records that as the trigger for switching
@@ -32,7 +34,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 
 | Script | Network | Persistent storage | Notable capability |
 |---|---|---|---|
-| `github-actions-ci-branch-pin` | Two same-origin `fetch` calls to `github.com`, with `credentials: 'include'` | `GM_setValue`: default branch per repo, cached 7 days | Also registers a `GM_registerMenuCommand` entry to clear that cache |
+| `github-actions-ci-branch-pin` | Two same-origin `fetch` calls to `github.com`, with `credentials: 'include'` | `GM_setValue`: default branch per repo, cached 7 days | Also registers a `GM_registerMenuCommand` entry, `Re-detect default branch`, which refetches and overwrites that cache |
 | `github-nav-reorder` | none | none | Injects CSS at `document-start` to prevent a flash of the native nav |
 | `github-tab-title-numbers` | none | none | Rewrites `document.title`, and reads the merge box to derive the CI marker. Patches `history.pushState` / `replaceState` to notice SPA navigation |
 | `github-auto-expand-single-check-group` | none | none | Opens check workflow `<details>` elements |

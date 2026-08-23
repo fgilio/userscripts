@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Actions — CI + default branch pin
 // @namespace    https://github.com/fgilio
-// @version      1.2.1
+// @version      1.2.2
 // @description  Pins a "CI+main" filter at the top of the GitHub Actions sidebar: one click to the CI workflow runs on the repository default branch.
 // @author       Franco Gilio
 // @icon         https://github.githubassets.com/favicons/favicon.svg
@@ -257,7 +257,7 @@
   new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
   // 'soft-nav:end' is GitHub's React router, which drives the Actions pages and
   // fires nothing else; the rest cover the Turbo/pjax pages GitHub still serves.
-  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:apply', 'turbo:frame-apply', 'pjax:end']) {
+  for (const event of ['soft-nav:end', 'turbo:load', 'turbo:render', 'turbo:frame-render', 'pjax:end']) {
     document.addEventListener(event, schedule);
   }
   window.addEventListener('popstate', schedule);

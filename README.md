@@ -8,7 +8,7 @@ modal with no "select all". Two dashboards that clearly know about each other an
 don't link to each other. A sidebar with a keyboard shortcut on one site and nothing on
 the next nine. None of it is hard to fix, which is the annoying part.
 
-Five of these are GitHub, three are Laravel Cloud, and one is a single sidebar toggle
+Six of these are GitHub, three are Laravel Cloud, and one is a single sidebar toggle
 that behaves the same way across ten sites that each hide their sidebar behind a
 different button. They're built for my habits, so treat the list as a menu rather than a
 suite.

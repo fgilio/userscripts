@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Laravel Cloud ↔ Nightwatch Linker
 // @namespace    http://tampermonkey.net/
-// @version      3.0.0
+// @version      3.0.1
 // @description  Native-looking links between Laravel Cloud environments and Nightwatch dashboards
 // @author       Franco Gilio
 // @match        https://cloud.laravel.com/*
@@ -22,6 +22,10 @@
 
   var TAG = '[cloud-nightwatch]';
   var STORAGE_KEY = 'laravel-cloud-nightwatch-mappings';
+
+  // UUIDs already reported as unpaired. addNightwatchLink() runs on every
+  // mutation batch, and the pairing warning is worth exactly one line.
+  var warnedUnpaired = {};
 
   // Entry: { uuid, region, cloudPath }, keyed 'org:app:env'.
   // Two legacy shapes migrate on read: a bare string value, and the old
@@ -325,7 +329,8 @@ function buildCloudButton(label, href, onClick) {
       mappings[key] = existing;
       saveMappings(mappings);
     }
-    if (!key) {
+    if (!key && !warnedUnpaired[nw.envUuid]) {
+      warnedUnpaired[nw.envUuid] = true;
       console.warn(TAG, 'no Cloud environment paired with this Nightwatch UUID yet');
     }
 
