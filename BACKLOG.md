@@ -11,6 +11,11 @@ so anything below can be compared against the original.
 - [ ] Re-export into `backup/tampermonkey-export-<date>/` after pairing any new
       Cloud/Nightwatch environment. The import replaces `GM_setValue` storage
       rather than merging it, so a stale snapshot silently drops new pairings.
+      Mitigated 2026-08-23: updating installed scripts now goes through their raw
+      URLs, which never touch storage, so the zip is only used for a fresh
+      machine. CLAUDE.md *Installing* says so in as many words. The re-export is
+      still worth doing, but it is no longer the thing standing between an update
+      and losing pairings.
       The 2026-08-19 snapshot holds 57 of them.
 
 ## Declined during the audit, recorded so they are not rediscovered

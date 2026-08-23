@@ -145,23 +145,54 @@ Gotchas seen in practice:
 
 ## Installing
 
-One script:
+### Updating what is already installed: use this, it is the good one
+
+After pushing to `main`, open every changed script's raw URL. Tampermonkey recognises a
+`.user.js` URL and shows an **update** prompt, matched on `@name` + `@namespace`, so each
+one updates in place. Franco confirmed this is the flow he wants (2026-08-23).
+
+```bash
+BASE="https://raw.githubusercontent.com/fgilio/userscripts/main/scripts"
+for f in $(git ls-files 'scripts/*.user.js' | xargs -n1 basename); do open "$BASE/$f"; done
+```
+
+One `open` per script, one click each, and nothing else touched. Three reasons it beats
+every other route:
+
+- **It never touches `GM_setValue` storage.** Only the script body changes.
+- **It needs no local server**, unlike `bin/install.sh`.
+- **It arms `@updateURL`.** From then on Tampermonkey tracks `main` by itself, so this
+  manual pass is only needed for a script that does not yet carry the header.
+
+Before doing this on a script that stores anything, re-export into `backup/` first. It is
+the only rollback point, and a storage migration runs on first read of the new version.
+
+### Do NOT use the zip to update in place
+
+`bin/build-import-zip.py` **replaces** storage rather than merging it, from whatever
+snapshot is sitting in `backup/`. Running it to update a live browser pushes a stale
+`storage.json` over newer data and silently drops every pairing made since the export.
+The zip is for restoring onto a fresh machine. Nothing else.
+
+### One script, from a working copy that is not pushed yet
 
 ```bash
 bin/install.sh scripts/<name>.user.js     # serves over localhost, Tampermonkey prompts
 pbcopy < scripts/<name>.user.js           # fallback: paste into a new Tampermonkey script
 ```
 
-Everything, in one shot:
+### Everything, onto a fresh machine
 
 ```bash
 bin/build-import-zip.py                   # -> dist/userscripts-import.zip
+bin/build-import-zip.py --source-only     # no local state, safe to hand to anyone
 # Tampermonkey → Utilities → Import from file → Choose File
 ```
 
-The import merges, and it refuses to build if `bin/check.sh` reports an error. Tampermonkey
-falls back to matching on `@name` + `@namespace`, so golden rule 1 is enforced by the
-extension itself. Full matching rules: README.md, *Syncing the repo into Tampermonkey*.
+It refuses to build if `bin/check.sh` reports an error, and warns when a default build
+carries private storage. Tampermonkey falls back to matching on `@name` + `@namespace`, so
+golden rule 1 is enforced by the extension itself. Full matching rules: README.md,
+*Syncing the repo into Tampermonkey*.
 
 Re-export from Tampermonkey into `backup/` after editing a script in the Tampermonkey
 editor, so this repo stays authoritative.
