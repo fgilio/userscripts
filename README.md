@@ -1,6 +1,16 @@
 # Userscripts
 
-Franco's Tampermonkey userscripts. Source of truth for what is installed in Chrome.
+My Tampermonkey userscripts, and the source of truth for what's installed in my Chrome.
+
+Every one of these started the same way. Something I do many times a day, that the site
+makes slightly worse than it has to be. Tabs in an order nobody chose. A permissions
+modal with no "select all". Two dashboards that clearly know about each other and still
+don't link to each other. A sidebar with a keyboard shortcut on one site and nothing on
+the next nine. None of it is hard to fix, which is the annoying part.
+
+Five of these are GitHub, two are Laravel Cloud, and one is a single sidebar toggle that
+behaves the same way across ten sites that each hide their sidebar behind a different
+button. They're built for my habits, so treat the list as a menu rather than a suite.
 
 ## Install
 
@@ -8,8 +18,8 @@ Install [Tampermonkey](https://www.tampermonkey.net/), then click a script name 
 table below. Tampermonkey recognises a raw `.user.js` URL and shows its own install
 prompt. Every script carries `@updateURL`, so it tracks `main` from then on.
 
-Developed and used in Chrome on macOS. Nothing here is Chrome-specific, so Firefox with
-Tampermonkey or Violentmonkey ought to work, but nobody has verified that.
+Built and used in Chrome on macOS. Nothing here is Chrome-specific, so Firefox with
+Tampermonkey or Violentmonkey ought to work, but I haven't tried it.
 
 Worth knowing before you install anything:
 
@@ -19,8 +29,8 @@ Worth knowing before you install anything:
 - **These read the DOM of specific sites.** When a site redesigns, a script stops
   working rather than breaking the page. Check the console first: each one names the
   selector that missed. [Known fragilities](#known-fragilities) ranks them.
-- **Pick the ones you want.** This is a personal collection, not a suite. Several encode
-  Franco's preferences about tab order and keyboard chords.
+- **Pick the ones you want.** Several encode my own preferences about tab order and
+  keyboard chords, which may well not be yours.
 
 Changing anything locally, or want the whole set at once? See
 [CONTRIBUTING.md](CONTRIBUTING.md) and *Syncing the repo into Tampermonkey* below.
@@ -58,7 +68,7 @@ the observer simply runs again).
 | `laravel-cloud-collapsible-permissions` | medium | Structural heuristics ("a div whose 2 children look like a header and a checkbox list") plus literal `color(display-p3 ...)` tokens sampled from the live page |
 | `laravel-cloud-nightwatch-linker` | medium | Finds its mount point by the button text "Visit" and by `aside button[role=combobox]` |
 | `universal-sidebar-toggle` | low | Per-site `data-testid` / `aria-label` selectors, several per site as fallbacks |
-| `github-actions-ci-branch-pin` | low | Primer classes (`ActionListItem`) are stable; also parses `"defaultBranch"` out of the repo home page, with the refs endpoint as fallback |
+| `github-actions-ci-branch-pin` | low | Primer classes (`ActionListItem`) are stable. Also parses `"defaultBranch"` out of the repo home page, with the refs endpoint as fallback |
 | `github-auto-expand-single-check-group` | low | `details.checks-list-item` |
 | `github-tab-title-numbers` | low | Reads the number from the URL. Only the Actions-run label is scraped |
 
@@ -75,7 +85,7 @@ bin/build-import-zip.py --source-only     # the same, carrying no local state
 
 No build step and nothing to install: `bin/check.sh` wants `bash` and `node`, the zip
 builder wants `python3`. [CONTRIBUTING.md](CONTRIBUTING.md) has the golden rules and the
-pre-PR checklist. `CLAUDE.md` is the long-form playbook — header fields, the SPA boot
+pre-PR checklist. `CLAUDE.md` is the long-form playbook: header fields, the SPA boot
 pattern, `@run-at` selection, making injected UI look native, and testing through Chrome.
 `_template.user.js` is the file you copy to start a new script, and the home of the boot
 block. `snippets/` holds reference patterns, not canon.

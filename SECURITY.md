@@ -9,7 +9,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 
 - **No remote code.** No `@require`, no `@resource`, no injected `<script src>`, no
   `eval`, no `new Function`, no `setTimeout("string")`. What you read in the file is
-  everything that runs. This is a hard rule of the repo, not an accident — see the
+  everything that runs. This is a hard rule of the repo, not an accident. See the
   "Scripts are self-contained" golden rule in `CLAUDE.md`.
 - **No telemetry.** Nothing is sent to Franco or to any third party. There is no
   analytics, no error reporting, and no phone-home of any kind.
@@ -39,13 +39,14 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 | `github-pr-commits-newest-first` | none | none | Reorders existing DOM nodes |
 | `laravel-cloud-collapsible-permissions` | none | none | Clicks permission checkboxes on your behalf when you press Select all / Clear |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |
-| `universal-sidebar-toggle` | none | none | Runs in iframes and uses `postMessage` — see below |
+| `universal-sidebar-toggle` | none | none | Runs in iframes and uses `postMessage` (see below) |
 
 ### `github-actions-ci-branch-pin` and `credentials: 'include'`
 
 To label the pin correctly it needs the repository's default branch. It requests
-`/{owner}/{repo}` and, as a fallback, `/{owner}/{repo}/refs?type=branch` — both
-same-origin on `github.com`, with your session cookie, exactly as the page itself would.
+`/{owner}/{repo}` and, as a fallback, `/{owner}/{repo}/refs?type=branch`. Both are
+same-origin on `github.com` and sent with your session cookie, exactly as the page
+itself would.
 That is required to resolve a private repo you can see. It extracts one string, the
 branch name, and caches it under `GM_setValue`. Nothing else is read from the response
 and nothing leaves the browser.
@@ -53,7 +54,7 @@ and nothing leaves the browser.
 ### `universal-sidebar-toggle`, frames and `postMessage`
 
 This is the one script without `@noframes`, because a keyboard chord pressed while focus
-sits inside an iframe never reaches the top frame — key events do not cross document
+sits inside an iframe never reaches the top frame. Key events do not cross document
 boundaries. A subframe therefore forwards the chord to the top frame with
 `postMessage({type: 'fg-sidebar-toggle-request'}, '*')`, and only the top frame acts.
 
@@ -71,12 +72,12 @@ Two consequences, stated plainly:
 The repo forbids `prompt()` because it blocks the page and freezes browser automation.
 This script is the documented exception, marked with a `check-ignore` comment: it fires
 once, only when a pairing is missing, to read a URL you paste. The stored mapping never
-leaves your browser. `GM_setValue` data is not in this repo — see the `backup/` note in
+leaves your browser. `GM_setValue` data is not in this repo. See the `backup/` note in
 README.md.
 
 ## Reporting something
 
 Open an issue, or email the address on <https://github.com/fgilio>. This is a personal
-collection with no SLA and no security team; expect a best-effort reply from one person.
+collection with no SLA and no security team. Expect a best-effort reply from one person.
 If the finding is sensitive, say so in the issue without the details and Franco will
 follow up privately.
