@@ -34,8 +34,9 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 |---|---|---|---|
 | `github-actions-ci-branch-pin` | Two same-origin `fetch` calls to `github.com`, with `credentials: 'include'` | `GM_setValue`: default branch per repo, cached 7 days | Also registers a `GM_registerMenuCommand` entry to clear that cache |
 | `github-nav-reorder` | none | none | Injects CSS at `document-start` to prevent a flash of the native nav |
-| `github-tab-title-numbers` | none | none | Rewrites `document.title`; patches `history.pushState` / `replaceState` to notice SPA navigation |
-| `github-auto-expand-single-check-group` | none | none | Clicks one `<details>` open |
+| `github-tab-title-numbers` | none | none | Rewrites `document.title`, and reads the merge box to derive the CI marker. Patches `history.pushState` / `replaceState` to notice SPA navigation |
+| `github-auto-expand-single-check-group` | none | none | Opens check workflow `<details>` elements |
+| `github-pr-checks-signal-first` | none | none | Reorders existing check rows and workflow wrappers, and dims skipped jobs. Adds nothing and clicks nothing |
 | `github-pr-commits-newest-first` | none | none | Reorders existing DOM nodes |
 | `laravel-cloud-collapsible-permissions` | none | none | Clicks permission checkboxes on your behalf when you press Select all / Clear |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |
