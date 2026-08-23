@@ -36,7 +36,11 @@ network call, or a new capability.
    with a DOM marker (`getElementById`, `dataset.fgDone`), never with a "did I already run"
    flag. SPA navigation destroys the DOM but not your closure.
 4. **Never `alert` / `confirm` / `prompt`.** They block the page and freeze browser automation.
-   Use an injected inline input, or `GM_registerMenuCommand` for config.
+   Use an injected inline input, or `GM_registerMenuCommand` for config. One script breaks
+   this: `laravel-cloud-nightwatch-linker` reads a pasted URL with `prompt()` when a pairing
+   is missing. It carries the mandatory `check-ignore: prompt` pragma and SECURITY.md
+   documents it. Replacing it with an inline input is the standing fix, and no new script
+   gets the same exemption.
 5. **Fail visible, not silent.** When a selector misses, `console.warn` once with the selector
    text. Six months later that message is the whole debugging session.
 
