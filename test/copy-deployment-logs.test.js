@@ -91,6 +91,37 @@ const failed = {
   deployLogsUnavailable: true,
 };
 
+// A deployment still building. The status is namespaced on the phase that is
+// running, a running or pending step carries no duration at all, and a pending
+// step has no timestamp either.
+const building = {
+  deployment: { slug: '12', short_commit_hash: '50569ee', status: 'build.running', failure_reason: null },
+  deploymentSteps: {
+    build_logs: { progress: 'running', description: 'Build logs' },
+    deployment_logs: { progress: 'pending', description: 'Deployment logs' },
+  },
+  deploymentBuildSteps: [
+    {
+      description: 'Running build commands', status: 'running',
+      subSteps: [{ description: 'Running build commands', status: 'running', time: '00:00:10', output: '$ Running build command\ncomposer install' }],
+    },
+    {
+      description: 'Pushing application', status: 'pending',
+      subSteps: [
+        { description: 'Cleaning up environment', status: 'pending' },
+        { description: 'Uploading application', status: 'pending' },
+      ],
+    },
+  ],
+  deploymentDeploySteps: [
+    { description: 'Preparing deploy environment', status: 'pending', subSteps: [{ description: 'Preparing deploy environment', status: 'pending' }] },
+  ],
+  deploymentFailureReason: null,
+  cachedDiagnosis: null,
+  buildLogsUnavailable: false,
+  deployLogsUnavailable: false,
+};
+
 // --- DOM stub ---------------------------------------------------------------
 
 const CHEVRON_CLASS = 'flex size-5 shrink-0 items-center justify-center text-icon-alpha sm:size-8';
@@ -125,10 +156,10 @@ function el(props = {}) {
 }
 
 /** A step row: the header button, its title, its meta cell and its chevron. */
-function stepRow(description, visibleLog) {
+function stepRow(description, visibleLog, glyphless) {
   const chevronSvg = el({ tag: 'svg', attributes: { class: SVG_CLASS } });
   const chevron = el({ attributes: { class: CHEVRON_CLASS } });
-  chevron.querySelector = selector => (selector === 'svg' ? chevronSvg : null);
+  chevron.querySelector = selector => (selector === 'svg' && !glyphless ? chevronSvg : null);
 
   const title = el({ textContent: `\n  ${description}\n` });
   const meta = el();
@@ -158,7 +189,7 @@ function makeDocument(sections) {
   const rows = [];
 
   for (const section of sections) {
-    const sectionRows = section.steps.map(step => stepRow(step.description, step.visibleLog));
+    const sectionRows = section.steps.map(step => stepRow(step.description, step.visibleLog, section.glyphless));
     rows.push(...sectionRows);
 
     const strong = el({ textContent: section.title });
@@ -241,6 +272,7 @@ async function boot({ sections, path, respond }) {
 
   return {
     warnings,
+    context,
     /** Fires the script's own MutationObserver, the way a re-render would. */
     async rerun() {
       for (const callback of observed) callback([]);
@@ -329,6 +361,92 @@ const FINISHED_SECTIONS = [
     'These logs are no longer available, so the steps below carry no output.\n' +
     '\n' +
     '## Running build commands (cancelled)');
+
+  // A deployment that is still building has to copy cleanly too: it is the case
+  // you most want to hand to an agent, and every duration is missing.
+  const running = await boot({
+    sections: [{ title: 'Build logs', steps: [{ description: 'Running build commands' }, { description: 'Pushing application' }] },
+               { title: 'Deployment logs', steps: [{ description: 'Preparing deploy environment' }] }],
+    path: '/fgilio/accountpal/production/deployments/12/50569ee',
+    respond: responder(building),
+  });
+  check('a build in progress copies with no durations at all',
+    await running.copy('Copy all Build logs'),
+    'fgilio / accountpal / production / deployment 12 / 50569ee (build running)\n' +
+    '\n' +
+    '# Build logs\n' +
+    '\n' +
+    '## Running build commands (running)\n' +
+    '\n' +
+    '$ Running build command\ncomposer install\n' +
+    '\n' +
+    '## Pushing application (pending)\n' +
+    '\n' +
+    'Cleaning up environment (pending)\n' +
+    '\n' +
+    'Uploading application (pending)');
+
+  check('a step that has not started yet copies its heading alone',
+    await running.copy('Copy the Preparing deploy environment log'),
+    'fgilio / accountpal / production / deployment 12 / 50569ee (build running)\n' +
+    '\n' +
+    '## Preparing deploy environment (pending)');
+
+  // Nothing stops you navigating while the fetch is in flight. The response still
+  // describes the deployment you clicked on, so the heading has to as well.
+  const wandering = await boot({
+    sections: FINISHED_SECTIONS,
+    path: PATH,
+    respond: async () => {
+      wandering.context.location.pathname = '/fgilio/accountpal/production/deployments/9/45d296e';
+      wandering.context.location.href = 'https://cloud.laravel.com' + wandering.context.location.pathname;
+      return { ok: true, status: 200, text: async () => JSON.stringify({ props: finished }) };
+    },
+  });
+  checkIncludes('a navigation mid-fetch does not retitle the log',
+    await wandering.copy('Copy the Running build commands log'),
+    'deployment 11 / 50569ee (deployment succeeded)');
+
+  // And it must not throw when the new address is not a deployment at all.
+  const wanderedOff = await boot({
+    sections: FINISHED_SECTIONS,
+    path: PATH,
+    respond: async () => {
+      wanderedOff.context.location.pathname = '/fgilio/accountpal/production/deployments';
+      return { ok: true, status: 200, text: async () => JSON.stringify({ props: finished }) };
+    },
+  });
+  checkIncludes('leaving the deployment pages mid-fetch still copies',
+    await wanderedOff.copy('Copy the Running build commands log'),
+    '## Running build commands (finished, 13.6s)');
+
+  // A section is paired with the payload by position, so a title that disagrees
+  // means the pairing is wrong and the clipboard would get the other section.
+  const mislabelled = await boot({
+    sections: [{ title: 'Deployment logs', steps: [{ description: 'Running build commands' }] }],
+    path: PATH,
+    respond: responder(finished),
+  });
+  let wrongSection = null;
+  await mislabelled.copy('Copy all Deployment logs').catch(error => { wrongSection = error.message; });
+  check('a section the payload names differently is refused', wrongSection,
+    'section 0 is "Build logs" in the payload and "Deployment logs" on the page');
+
+  let wrongSectionStep = null;
+  await mislabelled.copy('Copy the Running build commands log').catch(error => { wrongSectionStep = error.message; });
+  check('a step copy checks its section too', wrongSectionStep,
+    'section 0 is "Build logs" in the payload and "Deployment logs" on the page');
+
+  // The chevron wrapper is the clone template and the glyph inside it is the
+  // icon. Losing the glyph must warn by name, not throw on every mutation tick.
+  const glyphless = await boot({
+    sections: [{ title: 'Build logs', steps: [{ description: 'Running build commands' }], glyphless: true }],
+    path: PATH,
+    respond: responder(finished),
+  });
+  check('a chevron with no glyph attaches nothing', glyphless.labels().length, 0);
+  checkIncludes('and says which selector missed', glyphless.warnings.join('\n'),
+    'the glyph inside the disclosure chevron not found (selector "svg")');
 
   // The page ships a payload for whichever deployment was opened directly, and
   // leaves it in place through every later Inertia visit. Copying it would hand

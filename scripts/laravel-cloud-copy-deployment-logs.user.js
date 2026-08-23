@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Laravel Cloud Copy Deployment Logs
 // @namespace    https://github.com/fgilio
-// @version      1.1.0
+// @version      1.2.0
 // @description  Adds a copy button to every step and every section of a Laravel Cloud deployment, so a build or deploy log reaches the clipboard as plain text without expanding anything
 // @author       Franco Gilio
 // @match        https://cloud.laravel.com/*
@@ -88,7 +88,7 @@
    * navigation that leaves it untouched, and a running deployment outgrows it
    * line by line. Reading it would hand an agent another build's logs.
    */
-  async function freshProps() {
+  async function freshDeployment() {
     const route = ROUTE.exec(location.pathname);
     if (!route) throw new Error('the address bar does not hold a deployment path');
 
@@ -106,7 +106,10 @@
     if (String(deployment.slug) !== slug || String(deployment.short_commit_hash) !== hash) {
       throw new Error(`the payload describes deployment ${deployment.slug}/${deployment.short_commit_hash}, not ${slug}/${hash}`);
     }
-    return props;
+    // The route travels with the payload rather than being read again later. You
+    // can navigate while the fetch is in flight, and the response still belongs
+    // to the deployment you clicked on.
+    return { props, route };
   }
 
 
@@ -130,8 +133,8 @@
     return parts.length ? parts.join('. ') : null;
   }
 
-  function provenance(props) {
-    const [, org, app, env, slug, hash] = ROUTE.exec(location.pathname);
+  function provenance({ props, route }) {
+    const [, org, app, env, slug, hash] = route;
     const lines = [`${org} / ${app} / ${env} / deployment ${slug} / ${hash}${annotate(props.deployment.status)}`];
 
     // Three separate accounts of a failure, and only the first reaches the page.
@@ -177,27 +180,41 @@
     return steps;
   }
 
-  function sectionTitle(props, sectionIndex, fallback) {
+  /**
+   * Sections are paired with the payload by position, so the title is checked
+   * before any of its steps are read. Copying the deploy log under a Build logs
+   * heading is worse than copying nothing.
+   */
+  function sectionTitle(props, sectionIndex, onPage) {
     const named = props.deploymentSteps && props.deploymentSteps[SECTIONS[sectionIndex].key];
-    return (named && named.description) || fallback;
+    const title = named && named.description;
+    if (!title) return onPage;
+    if (onPage && title !== onPage) {
+      throw new Error(`section ${sectionIndex} is "${title}" in the payload and "${onPage}" on the page`);
+    }
+    return title;
   }
 
-  function composeStep(props, sectionIndex, stepIndex, expected) {
+  function composeStep(deployment, sectionIndex, stepIndex, expected, onPage) {
+    const props = deployment.props;
+    sectionTitle(props, sectionIndex, onPage);
+
     const step = sectionSteps(props, sectionIndex)[stepIndex];
     if (!step) throw new Error(`the payload has no step ${stepIndex} in section ${sectionIndex}`);
     if (expected && step.description !== expected) {
       throw new Error(`step ${stepIndex} of section ${sectionIndex} is "${step.description}" in the payload and "${expected}" on the page`);
     }
-    return provenance(props).concat('', stepText(step)).join('\n');
+    return provenance(deployment).concat('', stepText(step)).join('\n');
   }
 
-  function composeSection(props, sectionIndex, fallbackTitle) {
-    const blocks = [`# ${sectionTitle(props, sectionIndex, fallbackTitle)}`];
+  function composeSection(deployment, sectionIndex, onPage) {
+    const props = deployment.props;
+    const blocks = [`# ${sectionTitle(props, sectionIndex, onPage)}`];
     if (props[SECTIONS[sectionIndex].unavailable]) {
       blocks.push('These logs are no longer available, so the steps below carry no output.');
     }
     for (const step of sectionSteps(props, sectionIndex)) blocks.push(stepText(step));
-    return provenance(props).concat('', blocks.join('\n\n')).join('\n');
+    return provenance(deployment).concat('', blocks.join('\n\n')).join('\n');
   }
 
 
@@ -256,12 +273,12 @@
    * is added to it: Laravel Cloud ships no hover:text-* utility, so a hover
    * colour would be a class its stylesheet never generated.
    */
-  function copyControl(chevron, label, compose) {
+  function copyControl(chevron, chevronGlyph, label, compose) {
     const control = chevron.cloneNode(false);
     control.setAttribute(MARKER, '1');
     control.setAttribute('role', 'button');
     control.setAttribute('tabindex', '0');
-    control.append(glyph(chevron.querySelector('svg')));
+    control.append(glyph(chevronGlyph));
 
     let restore = 0;
     function show(paths, text) {
@@ -311,11 +328,11 @@
   }
 
 
-  function attach(meta, chevron, label, compose) {
+  function attach(meta, template, label, compose) {
     if (!meta || meta.querySelector(`[${MARKER}]`)) return;
     // Appended last on purpose: React owns this row's other children and
     // reconciles them by position, so a trailing node is the safe one to add.
-    meta.append(copyControl(chevron, label, compose));
+    meta.append(copyControl(template.chevron, template.glyph, label, compose));
   }
 
   function apply() {
@@ -338,24 +355,29 @@
       const chevron = need(stepHeaders[0], SEL.chevron, 'the disclosure chevron cloned for every copy control');
       if (!chevron) return;
 
+      const chevronGlyph = need(chevron, 'svg', 'the glyph inside the disclosure chevron');
+      if (!chevronGlyph) return;
+
+      const template = { chevron: chevron, glyph: chevronGlyph };
+      const titleNode = sectionHeader.querySelector(SEL.sectionTitle);
+      const sectionName = titleNode ? titleNode.textContent.trim() : null;
+
       stepHeaders.forEach((stepHeader, stepIndex) => {
         const title = stepHeader.querySelector(SEL.stepTitle);
         const name = title ? title.textContent.trim() : null;
-        attach(stepHeader.lastElementChild, chevron, `Copy the ${name || 'step'} log`, () =>
+        attach(stepHeader.lastElementChild, template, `Copy the ${name || 'step'} log`, () =>
           withFallback(
-            freshProps().then(props => composeStep(props, sectionIndex, stepIndex, name)),
+            freshDeployment().then(d => composeStep(d, sectionIndex, stepIndex, name, sectionName)),
             () => visibleStepText(stepHeader)
           ));
       });
 
-      const titleNode = sectionHeader.querySelector(SEL.sectionTitle);
-      const sectionName = titleNode ? titleNode.textContent.trim() : 'section';
-      attach(sectionHeader.lastElementChild, chevron, `Copy all ${sectionName}`, () =>
+      attach(sectionHeader.lastElementChild, template, `Copy all ${sectionName || 'steps'}`, () =>
         withFallback(
-          freshProps().then(props => composeSection(props, sectionIndex, sectionName)),
+          freshDeployment().then(d => composeSection(d, sectionIndex, sectionName)),
           () => {
             const shown = stepHeaders.map(visibleStepText).filter(Boolean);
-            return shown.length ? [`# ${sectionName}`].concat(shown).join('\n\n') : null;
+            return shown.length ? [`# ${sectionName || 'Steps'}`].concat(shown).join('\n\n') : null;
           }
         ));
     });
