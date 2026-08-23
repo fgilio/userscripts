@@ -21,10 +21,13 @@ so anything below can be compared against the original.
   `buildCloudButton` (roughly 15 lines, reached only when `findVisitButton()`
   returns null, which its caller already guards against) belongs with that same
   rewrite.
-- **Six scripts have no warn-once helper**, including `github-nav-reorder` and
-  `laravel-cloud-collapsible-permissions`, which README rates highest and medium
-  fragility. When either goes quiet there is nothing in the console to say which
-  selector missed. `_template.user.js` carries the `need()` helper to copy.
+- [x] **Warn-once for the fragile scripts.** Done 2026-08-23. `github-nav-reorder`
+      warns when a nav exists but its hashed tab list does not;
+      `laravel-cloud-collapsible-permissions` warns when the modal is open but no
+      category matches, and the message states the heuristic it wanted. Both gained the
+      `TAG` const they were missing. `github-auto-expand-single-check-group` and
+      `github-tab-title-numbers` were left silent on purpose: for them an absent target
+      is a normal state, not a break, so a warning would fire on every hydration.
 - **`semver`, `wildcard-match` and `raf` in `bin/check.sh` fire on nothing today.**
   They were kept deliberately: a guard that does not fire because the code is
   clean is working, not dead.

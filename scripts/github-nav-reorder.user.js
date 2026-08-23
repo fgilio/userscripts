@@ -1,18 +1,22 @@
 // ==UserScript==
 // @name         GitHub Repo & Org Nav Reorder
 // @namespace    https://github.com/
-// @version      3.3.0
+// @version      3.4.0
 // @description  Reorders the repo and org tab navs, flattens the "More" overflow, adds a Releases tab, and hides tab icons without flicker
 // @author       Franco Gilio
 // @match        https://github.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-nav-reorder.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-nav-reorder.user.js
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
 
 (function () {
   'use strict';
+
+  const TAG = '[nav-reorder]';
 
   const LEAD_ORDER = ['settings', 'code', 'pull-requests', 'actions', 'releases'];
 
@@ -24,6 +28,22 @@
 
   const VIS_SEL = 'ul.prc-components-UnderlineItemList-xKlKC';
   const DD_SEL  = 'ul.prc-ActionList-ActionList-rPFF2';
+
+  // VIS_SEL and DD_SEL are hashed Primer CSS-module names, so they are the two
+  // things here that change without notice. An absent nav is not worth reporting
+  // (most of github.com is neither a repo nor an org page), but a nav that exists
+  // and does not contain its own tab list means the hash moved. Warn once per
+  // selector, and clear the flag on recovery so a genuine later break warns again.
+  const warned = new Set();
+  function needIn(nav, selector, what) {
+    const el = nav.querySelector(selector);
+    if (el) { warned.delete(selector); return el; }
+    if (!warned.has(selector)) {
+      warned.add(selector);
+      console.warn(`${TAG} ${what} not found (selector "${selector}"). GitHub's hashed class changed. Update it in this script.`);
+    }
+    return null;
+  }
 
   // The nav reveals itself unreordered after this, so a markup change cannot
   // leave a blank gap where the tabs should be.
@@ -114,6 +134,7 @@ ${NAV} ${VIS_SEL}:not([data-fg-ready]) { visibility: hidden !important; }
   }
 
   function flattenAndDedupe(nav, visible) {
+    // Absent is legitimate here: a repo with few tabs renders no "More" overflow.
     const dd = nav.querySelector(DD_SEL);
     if (dd) {
       visible.append(...[...dd.children].filter(tabKey));
@@ -143,7 +164,7 @@ ${NAV} ${VIS_SEL}:not([data-fg-ready]) { visibility: hidden !important; }
   }
 
   function applyRepo(nav) {
-    const visible = nav.querySelector(VIS_SEL);
+    const visible = needIn(nav, VIS_SEL, 'repository tab list');
     if (!visible) return;
     const codeLink = visible.querySelector('a[data-tab-item="code"]') ||
             nav.querySelector('a[data-tab-item="code"]');
@@ -182,7 +203,7 @@ ${NAV} ${VIS_SEL}:not([data-fg-ready]) { visibility: hidden !important; }
   }
 
   function applyOrg(nav) {
-    const visible = nav.querySelector(VIS_SEL);
+    const visible = needIn(nav, VIS_SEL, 'organization tab list');
     if (!visible) return;
 
     const overviewLink = visible.querySelector('a[data-tab-item="overview"]') ||

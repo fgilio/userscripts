@@ -1,0 +1,32 @@
+name: CI
+
+# Pull requests from forks included: the linter is the only gate this repo has,
+# and it needs no secrets, so there is nothing to withhold from a fork.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # bin/check.sh shells out to `node --check` for syntax. Ubuntu runners ship
+      # node already; pinning it here keeps a runner image change from silently
+      # altering which parser validates the scripts.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Lint every script
+        run: bin/check.sh
+
+      - name: Run the tests
+        run: bin/test.sh
+
+      # Proves the importable zip still builds from a clean clone. There is no
+      # backup/ here, so this exercises exactly the source-only path a stranger gets.
+      - name: Build the import zip
+        run: python3 bin/build-import-zip.py --source-only

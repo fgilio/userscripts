@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build a Tampermonkey-importable zip from this repo.
 
-    bin/build-import-zip.py            -> dist/userscripts-import.zip
+    bin/build-import-zip.py                -> dist/userscripts-import.zip
+    bin/build-import-zip.py --source-only  -> the same, with no local state at all
 
 Load it with Tampermonkey -> Utilities -> Import from file. The import merges rather
 than wipes. README.md documents the matching rules under "Syncing the repo into
@@ -10,7 +11,13 @@ Tampermonkey".
 Operationally: a script ships with its options.json when backup/ has one (so its
 uuid, enabled state and sidebar position survive), and source-only otherwise
 (matched by @name + @namespace).
+
+The default build is a personal restore artifact, not a shareable one: it can carry
+GM_setValue storage out of backup/, which for the Nightwatch linker is internal
+environment UUIDs. Pass --source-only for a zip that is safe to hand to anyone. A
+clone without backup/ is source-only either way, so this only affects this machine.
 """
+import argparse
 import glob
 import json
 import os
@@ -36,6 +43,13 @@ def meta_name(source):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('--source-only', action='store_true',
+                        help='ship script sources only: no options.json, no storage.json. '
+                             'Use this for any zip that leaves this machine.')
+    args = parser.parse_args()
+
     os.chdir(REPO)
 
     lint = subprocess.run(['bin/check.sh'], capture_output=True, text=True)
@@ -43,8 +57,10 @@ def main():
         sys.exit(f'refusing to build, bin/check.sh reports errors:\n{lint.stdout}{lint.stderr}')
 
     backups = sorted(glob.glob('backup/tampermonkey-export-*'))
-    backup = backups[-1] if backups else None
-    if not backup:
+    backup = None if args.source_only else (backups[-1] if backups else None)
+    if args.source_only:
+        print('--source-only: shipping sources only. No options.json, no storage.json.\n')
+    elif not backup:
         print('note: no backup/tampermonkey-export-* found (it is gitignored, so a fresh\n'
               '      clone has none). Every script will ship source-only and be matched by\n'
               '      @name + @namespace. Enabled state and sidebar position will not be\n'
@@ -60,6 +76,7 @@ def main():
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     rows = []
+    private = []          # scripts whose private GM_setValue storage went into the zip
 
     with zipfile.ZipFile(OUT, 'w', zipfile.ZIP_DEFLATED) as z:
         for script in sorted(glob.glob('scripts/*.user.js')):   # retired/ is not globbed
@@ -89,6 +106,7 @@ def main():
                 stored = len(blob.get('data') or {})
                 if stored:                    # empty storage is not restored anyway
                     z.writestr(f'{base}.storage.json', json.dumps(blob))
+                    private.append(base)
 
             settings = data.get('settings', {})
             rows.append((base,
@@ -107,6 +125,11 @@ def main():
     print(f'\n{len(rows)} script(s) -> {OUT.relative_to(REPO)} ({OUT.stat().st_size} bytes)')
     print('\nImport it: Tampermonkey -> Utilities -> Import from file -> Choose File')
     print('Tampermonkey shows a confirmation screen listing every script before applying.')
+
+    if private:
+        print(f'\nDO NOT SHARE THIS ZIP. It carries the private GM_setValue storage of: '
+              f'{", ".join(private)}.\nRebuild with --source-only for a zip you can hand to '
+              f'anyone.')
 
 
 if __name__ == '__main__':

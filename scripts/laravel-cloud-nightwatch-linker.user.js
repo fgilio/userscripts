@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         Laravel Cloud ↔ Nightwatch Linker
 // @namespace    http://tampermonkey.net/
-// @version      2.2.0
+// @version      3.0.0
 // @description  Native-looking links between Laravel Cloud environments and Nightwatch dashboards
 // @author       Franco Gilio
 // @match        https://cloud.laravel.com/*
 // @match        https://nightwatch.laravel.com/*
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-nightwatch-linker.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-nightwatch-linker.user.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @run-at       document-idle
@@ -21,8 +23,10 @@
   var TAG = '[cloud-nightwatch]';
   var STORAGE_KEY = 'laravel-cloud-nightwatch-mappings';
 
-  // Entry: { uuid, region, cloudPath }. String entries are the legacy shape
-  // and migrate on read.
+  // Entry: { uuid, region, cloudPath }, keyed 'org:app:env'.
+  // Two legacy shapes migrate on read: a bare string value, and the old
+  // 'app:env' key, which collided whenever two orgs reused an app and
+  // environment name and could then open the wrong org's environment.
   function getMappings() {
     var raw;
     try { raw = JSON.parse(GM_getValue(STORAGE_KEY, '{}')); }
@@ -39,11 +43,60 @@
         raw[k].region = 'us';
       }
     });
+
+    // Re-key legacy 'app:env' entries to 'org:app:env'. cloudPath already carries
+    // the org, so anything that has been visited on Cloud migrates losslessly.
+    Object.keys(raw).forEach(function (k) {
+      if (k.split(':').length !== 2) return;
+      var path = raw[k] && raw[k].cloudPath;
+      var seg = path ? path.split('/') : [];
+      if (seg.length !== 3) return;
+      var upgraded = generateKey(seg[0], seg[1], seg[2]);
+      if (!raw[upgraded]) raw[upgraded] = raw[k];
+      delete raw[k];
+      changed = true;
+    });
+
     if (changed) { try { GM_setValue(STORAGE_KEY, JSON.stringify(raw)); } catch (e) {} }
     return raw;
   }
   function saveMappings(m) { GM_setValue(STORAGE_KEY, JSON.stringify(m)); }
-  function generateKey(app, env) { return app.toLowerCase() + ':' + env.toLowerCase(); }
+
+  // Fully qualified by org. Cloud always knows its org, so nothing here can
+  // collide; Nightwatch does not, which is why it looks up by UUID instead.
+  function generateKey(org, app, env) {
+    return org.toLowerCase() + ':' + app.toLowerCase() + ':' + env.toLowerCase();
+  }
+  function legacyKey(app, env) { return app.toLowerCase() + ':' + env.toLowerCase(); }
+
+  // Cloud is the only side that knows the org, so it is the only side that can move
+  // a legacy 'app:env' entry under its org-qualified key. Both Cloud entry points
+  // route through here: when only one of them adopted, the other would overwrite
+  // the org key with a bare entry and strand the uuid the legacy key was holding.
+  function adoptForCloud(mappings, info) {
+    var key = generateKey(info.org, info.app, info.env);
+    var entry = getEntry(mappings, key);
+    if (!entry) {
+      var legacy = legacyKey(info.app, info.env);
+      var stale = getEntry(mappings, legacy);
+      if (stale) {
+        entry = stale;
+        delete mappings[legacy];
+      }
+    }
+    return { key: key, entry: entry || {}, isNew: !mappings[key] };
+  }
+
+  // A Nightwatch environment UUID is globally unique, so this is the one lookup
+  // that is always unambiguous. Returns the key, or null.
+  function findKeyByUuid(mappings, uuid) {
+    var keys = Object.keys(mappings);
+    for (var i = 0; i < keys.length; i++) {
+      var e = getEntry(mappings, keys[i]);
+      if (e && e.uuid === uuid) return keys[i];
+    }
+    return null;
+  }
 
   function getEntry(mappings, key) {
     var e = mappings[key];
@@ -176,11 +229,21 @@ function buildCloudButton(label, href, onClick) {
     if (skip.indexOf(info.env) !== -1) return;
     if (document.getElementById('fg-nightwatch-link')) return;
 
-    var key = generateKey(info.app, info.env);
     var mappings = getMappings();
-    var entry = getEntry(mappings, key);
-    var uuid = entry && entry.uuid;
-    var region = (entry && entry.region) || 'us';
+    var found = adoptForCloud(mappings, info);
+    var key = found.key;
+    var entry = found.entry;
+
+    // Persist an adoption that recordCloudPath did not already write, so a legacy
+    // entry cannot be read here and then lost on the next page.
+    if (found.isNew && entry.uuid) {
+      entry.cloudPath = info.org + '/' + info.app + '/' + info.env;
+      mappings[key] = entry;
+      saveMappings(mappings);
+    }
+
+    var uuid = entry.uuid;
+    var region = entry.region || 'us';
 
     var visitBtn = findVisitButton();
     var container = visitBtn && visitBtn.parentElement;
@@ -246,16 +309,25 @@ function buildCloudButton(label, href, onClick) {
 
   function addNightwatchLink() {
     var nw = parseNightwatchUrl();
-    var appEnv = getNightwatchAppEnv();
-    if (!nw || !appEnv) return;
+    // The sidebar combobox is the anchor this link sits beside, so its presence
+    // doubles as the readiness signal that the aside has finished rendering.
+    if (!nw || !getNightwatchAppEnv()) return;
 
-    var key = generateKey(appEnv.app, appEnv.env);
+    // The UUID in this URL is globally unique. Matching on it is the only lookup
+    // that cannot resolve to another org's environment; app and env names can be
+    // reused freely across orgs, and this page never learns which org it is in.
     var mappings = getMappings();
-    var existing = getEntry(mappings, key) || {};
-    var dirty = false;
-    if (existing.uuid !== nw.envUuid) { existing.uuid = nw.envUuid; dirty = true; }
-    if (existing.region !== nw.region) { existing.region = nw.region; dirty = true; }
-    if (dirty) { mappings[key] = existing; saveMappings(mappings); }
+    var key = findKeyByUuid(mappings, nw.envUuid);
+    var existing = (key && getEntry(mappings, key)) || {};
+
+    if (key && existing.region !== nw.region) {
+      existing.region = nw.region;
+      mappings[key] = existing;
+      saveMappings(mappings);
+    }
+    if (!key) {
+      console.warn(TAG, 'no Cloud environment paired with this Nightwatch UUID yet');
+    }
 
     if (document.getElementById('fg-cloud-link')) return;
 
@@ -277,10 +349,16 @@ function buildCloudButton(label, href, onClick) {
         var path = m ? m[1] : null;
         if (!path && /^[^\/\s]+\/[^\/\s]+\/[^\/\s]+$/.test(u.trim())) path = u.trim();
         if (path) {
+          // The pasted path is 'org/app/env', which is exactly the org-qualified
+          // key this entry belongs under.
+          var seg = path.split('/');
           var mm = getMappings();
-          var ex = getEntry(mm, key) || {};
+          var newKey = generateKey(seg[0], seg[1], seg[2]);
+          var ex = getEntry(mm, newKey) || {};
           ex.cloudPath = path;
-          mm[key] = ex;
+          ex.uuid = nw.envUuid;
+          ex.region = nw.region;
+          mm[newKey] = ex;
           saveMappings(mm);
           location.reload();
         }
@@ -299,13 +377,14 @@ function buildCloudButton(label, href, onClick) {
   function recordCloudPath() {
     var info = parseCloudUrl();
     if (!info) return;
-    var key = generateKey(info.app, info.env);
     var m = getMappings();
-    var entry = getEntry(m, key) || {};
+    var found = adoptForCloud(m, info);
     var path = info.org + '/' + info.app + '/' + info.env;
-    if (entry.cloudPath !== path) {
-      entry.cloudPath = path;
-      m[key] = entry;
+    // found.isNew also covers an adoption, where the entry already carries the
+    // right cloudPath but is not yet stored under its org-qualified key.
+    if (found.isNew || found.entry.cloudPath !== path) {
+      found.entry.cloudPath = path;
+      m[found.key] = found.entry;
       saveMappings(m);
     }
   }

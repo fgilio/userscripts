@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Sidebar Toggle with Hyper Key
 // @namespace    http://tampermonkey.net/
-// @version      3.8.0
+// @version      4.0.0
 // @description  Toggle sidebar on multiple sites with macOS hyper key (Cmd+Shift+Ctrl+Option+S)
 // @author       Franco Gilio
 // @match        https://gitlab.com/*
@@ -15,6 +15,8 @@
 // @match        https://portal.singlestore.com/*
 // @match        https://dash.cloudflare.com/*
 // @match        https://docs.google.com/*
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/universal-sidebar-toggle.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/universal-sidebar-toggle.user.js
 // @grant        none
 // ==/UserScript==
 
@@ -22,15 +24,15 @@
   'use strict';
 
   // check-ignore: icon spans 10 sites, no single favicon represents it.
-  // check-ignore: noframes the shortcut must work when focus is inside an iframe,
-  // so only Google Docs (which renders the sidebar in several) is gated below.
+  // check-ignore: noframes the chord must work while focus is inside an iframe.
+  // Key events do not cross document boundaries, so a subframe cannot simply run
+  // the toggle: it forwards the chord to the top frame, which owns the sidebar.
+  // Exactly one frame acts, so the toggle never fires twice.
 
   const TAG = '[sidebar-toggle]';
   const currentHost = location.hostname;
-
-  // Google Docs renders the sidebar inside several iframes, so one handler per
-  // frame would fire the toggle once per frame.
-  if (currentHost === 'docs.google.com' && window !== window.top) return;
+  const BRIDGE_MESSAGE = 'fg-sidebar-toggle-request';
+  const isSubframe = window !== window.top;
 
   const SITE_CONFIG = {
     'gitlab.com': {
@@ -181,14 +183,7 @@
     }
   }
 
-  function handleKeyDown(event) {
-    if (!(event.metaKey && event.shiftKey && event.ctrlKey && event.altKey && event.code === 'KeyS')) return;
-
-    // Google Docs claims this chord on the document, so stop it here.
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
+  function toggleSidebar() {
     const toggleButton = findToggleButton();
     if (!toggleButton) {
       console.warn(`${TAG} No sidebar toggle on ${currentHost}. Tried: ${config.selectors.join(', ')}`);
@@ -197,5 +192,30 @@
     clickButton(toggleButton);
   }
 
+  function handleKeyDown(event) {
+    if (!(event.metaKey && event.shiftKey && event.ctrlKey && event.altKey && event.code === 'KeyS')) return;
+
+    // Google Docs claims this chord on the document, so stop it here.
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+
+    if (isSubframe) {
+      // '*' as the target origin: a frame cannot read the top origin when the two
+      // differ, and the only thing this message can ask for is a sidebar toggle.
+      window.top.postMessage({ type: BRIDGE_MESSAGE }, '*');
+      return;
+    }
+    toggleSidebar();
+  }
+
   document.addEventListener('keydown', handleKeyDown, config.useCapturePhase);
+
+  // Only the top frame owns a sidebar, so only it listens. Any page could post
+  // this message; the worst it can do is collapse a sidebar the user can reopen.
+  if (!isSubframe) {
+    window.addEventListener('message', event => {
+      if (event.data && event.data.type === BRIDGE_MESSAGE) toggleSidebar();
+    });
+  }
 })();

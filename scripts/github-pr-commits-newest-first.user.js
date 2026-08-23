@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         GitHub PR Commits — Newest First
 // @namespace    https://github.com/
-// @version      1.3.0
+// @version      1.3.1
 // @description  Reverse the PR Commits tab so newest commits (and newest day) appear on top
 // @author       Franco Gilio
 // @match        https://github.com/*/*/pull/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @run-at       document-idle
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-commits-newest-first.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-commits-newest-first.user.js
 // @grant        none
 // ==/UserScript==
 

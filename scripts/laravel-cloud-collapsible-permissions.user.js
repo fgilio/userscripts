@@ -1,18 +1,22 @@
 // ==UserScript==
 // @name         Laravel Cloud - Collapsible Permission Categories
 // @namespace    https://cloud.laravel.com/
-// @version      1.14.0
+// @version      1.16.0
 // @description  Collapsible permission categories + Select all / Clear with live count (amber at zero), plus a native-matching search box for the Resources list (flush to the list, with native focus ring), in the API token creation modal
 // @author       Franco Gilio
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
 // @match        https://cloud.laravel.com/*
 // @run-at       document-idle
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-collapsible-permissions.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-collapsible-permissions.user.js
 // @grant        none
 // ==/UserScript==
 
 (function () {
   'use strict';
+
+  const TAG = '[collapsible-permissions]';
 
   const ARROW_ATTR = 'data-fg-collapse-arrow';
   const TOOLBAR_ATTR = 'data-fg-perm-toolbar';
@@ -123,10 +127,17 @@
     return { total, checked };
   }
 
-  // Laravel Cloud re-renders on every toggle, so leave a gap between clicks.
+  // Laravel Cloud re-renders on every toggle, so leave a gap between clicks. That
+  // re-render also detaches the nodes a single snapshot would be holding, and a
+  // click on a detached node reaches no React handler and silently does nothing.
+  // Walk by index and re-query the live tree before every click instead.
   async function setAll(listContainer, checked) {
-    for (const g of [...listContainer.children]) {
-      const cb = g.children[0] && g.children[0].querySelector('[role=checkbox]');
+    const groupCount = listContainer.children.length;
+    for (let i = 0; i < groupCount; i++) {
+      const live = findListContainer() || listContainer;
+      const group = live.children[i];
+      const header = group && group.children[0];
+      const cb = header && header.querySelector('[role=checkbox]');
       if (!cb) continue;
       if ((cb.getAttribute('aria-checked') === 'true') !== checked) {
         cb.click();
@@ -299,10 +310,45 @@
     listWrapper.style.marginTop = '0px';
   }
 
+  // Everything this script builds lives in the API token modal, but @match covers
+  // all of Cloud. looksLikeGroup calls getComputedStyle, so running it over every
+  // div on every mutation would cost a full style recalc per keystroke elsewhere
+  // in the app. Find a scan root first, and do nothing at all when there is none.
+  function scanRoot() {
+    // Headless UI renders the modal as [role=dialog]. Prefer it, but only when it
+    // actually holds checkboxes, so an unrelated dialog cannot mask the list.
+    for (const dialog of document.querySelectorAll('[role=dialog]')) {
+      if (dialog.querySelector('[role=checkbox], input[type=checkbox]')) return dialog;
+    }
+    // No matching dialog. Fall back to the whole document, but only when a checkbox
+    // exists somewhere: the cheapest available proxy for "there is work to do".
+    return document.querySelector('[role=checkbox], input[type=checkbox]') ? document : null;
+  }
+
+  // Every selector here is a structural heuristic rather than a name, so there is
+  // no single selector string to report. What is worth reporting is the outcome:
+  // a modal that is open with checkboxes in it, yet not one recognisable category.
+  let warnedNoGroups = false;
+
   function apply() {
-    document.querySelectorAll('div').forEach(el => {
-      if (looksLikeGroup(el)) enhanceGroup(el);
+    const root = scanRoot();
+    if (!root) return;
+
+    let groups = 0;
+    root.querySelectorAll('div').forEach(el => {
+      if (looksLikeGroup(el)) { enhanceGroup(el); groups++; }
     });
+
+    if (groups) {
+      warnedNoGroups = false;
+    } else if (!warnedNoGroups) {
+      warnedNoGroups = true;
+      console.warn(`${TAG} no permission categories matched. looksLikeGroup wants a div ` +
+                   `with exactly 2 children: a header holding a checkbox and a label of ` +
+                   `font-weight >= 500, then a body whose first row also holds a checkbox. ` +
+                   `Laravel Cloud changed the modal markup; update looksLikeGroup.`);
+    }
+
     ensureToolbar();
     ensureResourceSearch();
   }

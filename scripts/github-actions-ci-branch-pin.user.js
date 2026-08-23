@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         GitHub Actions — CI + default branch pin
 // @namespace    https://github.com/fgilio
-// @version      1.2.0
+// @version      1.2.1
 // @description  Pins a "CI+main" filter at the top of the GitHub Actions sidebar: one click to the CI workflow runs on the repository default branch.
 // @author       Franco Gilio
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @match        https://github.com/*/*/actions*
 // @run-at       document-idle
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-actions-ci-branch-pin.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-actions-ci-branch-pin.user.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand

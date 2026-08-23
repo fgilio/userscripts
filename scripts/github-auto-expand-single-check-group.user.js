@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         GitHub Auto-Expand Single Check Group
 // @namespace    https://github.com/
-// @version      1.3.0
+// @version      1.3.1
 // @description  Auto-expand a check workflow on the PR Checks tab when there is only one
 // @author       Franco Gilio
 // @match        https://github.com/*/*/pull/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @run-at       document-idle
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-auto-expand-single-check-group.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-auto-expand-single-check-group.user.js
 // @grant        none
 // ==/UserScript==
 

@@ -2,38 +2,54 @@
 
 Franco's Tampermonkey userscripts. Source of truth for what is installed in Chrome.
 
-`CLAUDE.md` is the playbook: conventions, the SPA boot pattern, testing, install.
-`_template.user.js` is the starting point for a new script.
+## Install
 
-```bash
-bin/check.sh                              # lint every script
-bin/build-import-zip.py                   # repo -> dist/userscripts-import.zip (lints first)
-bin/install.sh scripts/<name>.user.js     # push one script into Tampermonkey
-```
+Install [Tampermonkey](https://www.tampermonkey.net/), then click a script name in the
+table below. Tampermonkey recognises a raw `.user.js` URL and shows its own install
+prompt. Every script carries `@updateURL`, so it tracks `main` from then on.
 
-`snippets/` holds reference patterns, not canon. The boot block and the warn-once
-helper live in `_template.user.js`, which is the file you copy.
+Developed and used in Chrome on macOS. Nothing here is Chrome-specific, so Firefox with
+Tampermonkey or Violentmonkey ought to work, but nobody has verified that.
+
+Worth knowing before you install anything:
+
+- **Every script is self-contained.** No `@require`, no remote code, no `eval`, no build
+  step, and nothing is ever sent anywhere. [SECURITY.md](SECURITY.md) says exactly what
+  each one touches.
+- **These read the DOM of specific sites.** When a site redesigns, a script stops
+  working rather than breaking the page. Check the console first: each one names the
+  selector that missed. [Known fragilities](#known-fragilities) ranks them.
+- **Pick the ones you want.** This is a personal collection, not a suite. Several encode
+  Franco's preferences about tab order and keyboard chords.
+
+Changing anything locally, or want the whole set at once? See
+[CONTRIBUTING.md](CONTRIBUTING.md) and *Syncing the repo into Tampermonkey* below.
 
 ## Installed
 
 | Script | Sites | What it does |
 |---|---|---|
-| `github-actions-ci-branch-pin` | `github.com/*/*/actions*` | Pins **CI+main** at the top of the Actions sidebar, one click to the CI workflow on the repo's default branch. Branch is detected per repo and cached 7 days |
-| `github-nav-reorder` | `github.com/*` | Repo tabs reordered to Settings, Code, Pull requests, Actions, Releases. Settings pulled to the front of the org nav. Flattens the "More" overflow, adds a synthetic Releases tab, hides all tab icons |
-| `github-tab-title-numbers` | `github.com/*` | Prefixes the tab title with the issue/PR/discussion number. On Actions run pages, uses the originating PR number, falling back to the run number |
-| `github-auto-expand-single-check-group` | `github.com/*/*/pull/*` | On the PR Checks tab, expands the only check group when a PR has one |
-| `github-pr-commits-newest-first` | `github.com/*/*/pull/*` | Reverses the PR Commits tab so the newest commit and newest day are on top |
-| `laravel-cloud-nightwatch-linker` | `cloud.laravel.com`, `nightwatch.laravel.com` | Native-looking cross-links between a Laravel Cloud environment and its Nightwatch dashboard. Learns the pairing once, then remembers it |
-| `laravel-cloud-collapsible-permissions` | `cloud.laravel.com/*` | API token modal: collapsible permission categories, Select all / Clear with a live count, and a search box over the Resources list |
-| `universal-sidebar-toggle` | 10 sites | Hyper+S (⌘⇧⌃⌥S) toggles the sidebar. Per-site selector config. Handles Closure Library and pointer-event quirks |
+| [`github-actions-ci-branch-pin`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-actions-ci-branch-pin.user.js) | `github.com/*/*/actions*` | Pins **CI+main** at the top of the Actions sidebar, one click to the CI workflow on the repo's default branch. Branch is detected per repo and cached 7 days |
+| [`github-nav-reorder`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-nav-reorder.user.js) | `github.com/*` | Repo tabs reordered to Settings, Code, Pull requests, Actions, Releases. Settings pulled to the front of the org nav. Flattens the "More" overflow, adds a synthetic Releases tab, hides all tab icons |
+| [`github-tab-title-numbers`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-tab-title-numbers.user.js) | `github.com/*` | Prefixes the tab title with the issue/PR/discussion number. On Actions run pages, uses the originating PR number, falling back to the run number |
+| [`github-auto-expand-single-check-group`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-auto-expand-single-check-group.user.js) | `github.com/*/*/pull/*` | On the PR Checks tab, expands the only check group when a PR has one |
+| [`github-pr-commits-newest-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-commits-newest-first.user.js) | `github.com/*/*/pull/*` | Reverses the PR Commits tab so the newest commit and newest day are on top |
+| [`laravel-cloud-nightwatch-linker`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-nightwatch-linker.user.js) | `cloud.laravel.com`, `nightwatch.laravel.com` | Native-looking cross-links between a Laravel Cloud environment and its Nightwatch dashboard. Learns the pairing once, then remembers it |
+| [`laravel-cloud-collapsible-permissions`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-collapsible-permissions.user.js) | `cloud.laravel.com/*` | API token modal: collapsible permission categories, Select all / Clear with a live count, and a search box over the Resources list |
+| [`universal-sidebar-toggle`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/universal-sidebar-toggle.user.js) | 10 sites | Hyper+S (⌘⇧⌃⌥S) toggles the sidebar. Per-site selector config. Handles Closure Library and pointer-event quirks |
 
 Retired scripts are in `scripts/retired/` with the reason recorded (see that folder's README).
 
 ## Known fragilities
 
 Ranked by how likely they are to break. Hashed CSS-module class names change without
-notice. When a script goes quiet, check the console first, because each one names the
-selector that missed.
+notice. When a script goes quiet, check the console first: it warns once and names what
+it looked for.
+
+Two scripts stay silent deliberately, because a missing target is a normal state for
+them rather than a break: `github-auto-expand-single-check-group` (a PR with no check
+groups) and `github-tab-title-numbers` (the run label is null until React hydrates, and
+the observer simply runs again).
 
 | Script | Risk | What breaks it |
 |---|---|---|
@@ -45,6 +61,24 @@ selector that missed.
 | `github-actions-ci-branch-pin` | low | Primer classes (`ActionListItem`) are stable; also parses `"defaultBranch"` out of the repo home page, with the refs endpoint as fallback |
 | `github-auto-expand-single-check-group` | low | `details.checks-list-item` |
 | `github-tab-title-numbers` | low | Reads the number from the URL. Only the Actions-run label is scraped |
+
+## Working on this repo
+
+```bash
+bin/check.sh                              # lint every script
+bin/check.sh scripts/<name>.user.js       # lint one
+bin/test.sh                               # run test/*.test.js (plain node, no framework)
+bin/install.sh scripts/<name>.user.js     # push one script into Tampermonkey
+bin/build-import-zip.py                   # repo -> dist/userscripts-import.zip (lints first)
+bin/build-import-zip.py --source-only     # the same, carrying no local state
+```
+
+No build step and nothing to install: `bin/check.sh` wants `bash` and `node`, the zip
+builder wants `python3`. [CONTRIBUTING.md](CONTRIBUTING.md) has the golden rules and the
+pre-PR checklist. `CLAUDE.md` is the long-form playbook — header fields, the SPA boot
+pattern, `@run-at` selection, making injected UI look native, and testing through Chrome.
+`_template.user.js` is the file you copy to start a new script, and the home of the boot
+block. `snippets/` holds reference patterns, not canon.
 
 ## Syncing the repo into Tampermonkey
 
@@ -95,5 +129,6 @@ Re-export from Tampermonkey → Utilities → Export after any change worth keep
 
 ## Git
 
-Keep the remote private if `backup/` is ever un-ignored: those exports carry internal
-environment UUIDs.
+The remote is public. `backup/` stays gitignored permanently, and that is the whole of the
+privacy story for the working tree: those exports carry internal environment UUIDs, so
+un-ignoring the directory publishes them.

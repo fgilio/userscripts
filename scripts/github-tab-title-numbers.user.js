@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         GitHub Issue/PR/Run Number in Tab Title
 // @namespace    https://github.com/
-// @version      1.3.0
+// @version      1.3.1
 // @description  Prefixes the tab title with the issue/PR/discussion number, or on Actions run pages the originating PR number
 // @author       Franco Gilio
 // @match        https://github.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @noframes
+// @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-tab-title-numbers.user.js
+// @updateURL   https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-tab-title-numbers.user.js
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==

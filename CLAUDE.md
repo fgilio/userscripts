@@ -7,10 +7,16 @@ Tampermonkey userscripts for Chrome. One file per script in `scripts/`, self-con
 ```
 scripts/      one <kebab-name>.user.js per script (the only source of truth)
 snippets/     reference patterns to copy from (see snippets/README.md, not canon)
-bin/          check.sh (lint), build-import-zip.py (repo -> importable zip), install.sh
+test/         *.test.js, plain node, no framework. Logic that needs no browser
+bin/          check.sh (lint), test.sh, build-import-zip.py (repo -> importable zip), install.sh
 backup/       raw Tampermonkey export: .options.json + .storage.json (gitignored)
 _template.user.js   start here for a new script, and the home of the boot block
 ```
+
+Public-facing docs: `README.md` (install links + what each script does),
+`CONTRIBUTING.md` (golden rules, pre-PR checklist), `SECURITY.md` (what every script
+touches). Keep `SECURITY.md` true: update it whenever a script gains a `@grant`, a
+network call, or a new capability.
 
 ## Golden rules
 
