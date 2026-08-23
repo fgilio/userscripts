@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         GitHub Auto-Expand Single Check Group
 // @namespace    https://github.com/
-// @version      1.4.0
-// @description  Auto-expands check workflows on the PR Checks tab: all of them up to three, otherwise only the one named CI
+// @version      1.5.0
+// @description  Auto-expands check workflows on the PR Checks tab: all of them up to three, otherwise the one named CI plus any workflow holding a failure
 // @author       Franco Gilio
 // @match        https://github.com/*/*/pull/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
@@ -24,10 +24,20 @@
   const TAG = '[auto-expand]';
   const SELECTOR = 'details.checks-list-item';
 
+  // `checks-list-item` is on the workflow <summary> as well as on every job row, so
+  // the row selector has to say div where the workflow selector says details.
+  const ROW = 'div.checks-list-item';
+
+  // Read from the accessible name on a job's status icon, e.g. "This job failed".
+  // Verified that the rows stay in the DOM while their workflow is collapsed, which
+  // is what makes a failure findable before anything has been opened.
+  const FAILED = /fail|timed out|cancel|action required|error/i;
+
   const ROUTE = /\/pull\/\d+\/checks(?:[/?#]|$)/;
 
-  // Up to this many groups, open all of them. Above it, only CI is worth opening,
-  // because the whole point is not to face a wall of collapsed workflows.
+  // Up to this many workflows, open all of them. Above it, open only what is worth
+  // reading (CI, plus anything failing), because the point is not to face a wall of
+  // collapsed workflows.
   const EXPAND_ALL_UP_TO = 3;
   const CI_NAME = 'ci';
 
@@ -46,6 +56,15 @@
     const summary = details.querySelector('summary');
     if (!summary) return null;
     return summary.textContent.trim().split('\n').map(s => s.trim()).find(Boolean) ?? null;
+  }
+
+  /** True when any job in this workflow needs attention. */
+  function hasFailure(group) {
+    for (const row of group.querySelectorAll(ROW)) {
+      const icon = row.querySelector('svg[aria-label]') ?? row.querySelector('[aria-label]');
+      if (icon && FAILED.test(icon.getAttribute('aria-label'))) return true;
+    }
+    return false;
   }
 
   function expand(details) {
@@ -77,15 +96,23 @@
                    `GitHub changed the markup; update groupName().`);
     }
 
-    const ci = named.filter(([, name]) => name && name.toLowerCase() === CI_NAME);
-    if (ci.length) {
-      ci.forEach(([group]) => expand(group));
+    // A workflow holding a failure is opened whatever it is called. Without this a
+    // failure outside CI was hoisted to the top of the page by
+    // github-pr-checks-signal-first and then left shut, which is worse than either
+    // behaviour on its own.
+    const wanted = new Set(groups.filter(hasFailure));
+    for (const [group, name] of named) {
+      if (name && name.toLowerCase() === CI_NAME) wanted.add(group);
+    }
+
+    if (wanted.size) {
+      wanted.forEach(expand);
       return;
     }
 
-    // No group is called CI. Plenty of repos name their workflows something else
-    // entirely, so this is an ordinary state rather than a fault: fall back to the
-    // small-list behaviour and open everything. Deliberately quiet.
+    // Nothing failing and nothing called CI. Plenty of repos name their workflows
+    // something else entirely, so this is an ordinary state rather than a fault:
+    // fall back to the small-list behaviour and open everything. Deliberately quiet.
     groups.forEach(expand);
   }
 
