@@ -42,6 +42,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 | `github-pr-commits-newest-first` | none | none | Reorders existing DOM nodes |
 | `laravel-cloud-copy-deployment-logs` | One same-origin `fetch` of the deployment page you are already on, with `credentials: 'same-origin'` | none | Writes to the clipboard, only when you click a copy control |
 | `laravel-cloud-collapsible-permissions` | none | none | Clicks permission checkboxes on your behalf when you press Select all / Clear |
+| `laravel-cloud-firewall-rules-unclip` | none | none | Sets inline flex/overflow styles on existing firewall rule rows and a `title` attribute carrying each rule's own name. Adds nothing else and clicks nothing |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |
 | `universal-sidebar-toggle` | none | none | Runs in iframes and uses `postMessage` (see below) |
 
