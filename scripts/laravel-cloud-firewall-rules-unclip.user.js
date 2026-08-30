@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Laravel Cloud - Firewall Rules Unclip
 // @namespace    https://github.com/fgilio
-// @version      1.0.0
+// @version      1.0.1
 // @description  Truncate long firewall rule names with an ellipsis so the events count stays visible, and lock the rules cards against the stray horizontal scroll that hides the action column, on edge network zone pages
 // @author       Franco Gilio
 // @icon         https://cloud.laravel.com/docs/_mintlify/favicons/cloud/CwnEEs8UQ8WD3Jou/_generated/favicon/apple-touch-icon.png
@@ -61,9 +61,15 @@
   // shove the whole table sideways and hide the action column. overflow: clip
   // keeps the visual clipping but removes the scroll container entirely.
   function fixCard(row) {
+    // A card this script already clipped computes overflow-x: clip, so the
+    // climb must stop on clip as well as hidden. Otherwise the next row walks
+    // past its own card onto the body, whose overflow-x-hidden would match,
+    // and clipping the body freezes page scrolling entirely.
     let card = row.parentElement;
-    while (card && getComputedStyle(card).overflowX !== 'hidden') card = card.parentElement;
-    if (!card || card.dataset.fgUnclipped === '1') return;
+    while (card && card !== document.body && !/^(hidden|clip)$/.test(getComputedStyle(card).overflowX)) {
+      card = card.parentElement;
+    }
+    if (!card || card === document.body || card.dataset.fgUnclipped === '1') return;
     card.style.overflow = 'clip';
     card.scrollLeft = 0;
     card.dataset.fgUnclipped = '1';
