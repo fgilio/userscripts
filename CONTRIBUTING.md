@@ -39,12 +39,15 @@ bin/test.sh                                 # run the tests
 every `test/*.test.js` as a plain node script: no framework, no `package.json`, nothing
 to install. Both run in CI on every push and pull request.
 
-Tests here cover logic that can be reasoned about without a browser: today that is the
-storage and migration layer of `laravel-cloud-nightwatch-linker`, where a mistake
-silently corrupts saved pairings. DOM behaviour is still verified by hand against the
-live site, per the checklist below. If you touch storage, add a case, and make sure it
-would actually fail against the old code, because a DOM stub that is too thin makes
-every assertion pass for the wrong reason.
+Tests here cover logic that can be reasoned about without a browser: the storage and
+migration layer of `laravel-cloud-nightwatch-linker`, where a mistake silently corrupts
+saved pairings, the clipboard text of `laravel-cloud-copy-deployment-logs`, and the rule
+id lookup of `laravel-cloud-firewall-rule-ids`. The last two read a page payload that
+goes stale the moment you navigate, so both are tested against a stale one. DOM
+behaviour is still verified by hand against the live site, per the checklist below. If
+you touch any of that, add a case, and make sure it would actually fail against the old
+code, because a DOM stub that is too thin makes every assertion pass for the wrong
+reason.
 `bin/build-import-zip.py` needs `python3`. `bin/install.sh` works on macOS, Linux and
 WSL; its clipboard copy and browser launch are best-effort and it prints the URL when
 neither is available.

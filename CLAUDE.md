@@ -149,11 +149,13 @@ Gotchas seen in practice:
 
 ## Installing
 
-### Updating what is already installed: use this, it is the good one
+### Always: commit, push to `main`, open the raw URL
 
-After pushing to `main`, open every changed script's raw URL. Tampermonkey recognises a
-`.user.js` URL and shows an **update** prompt, matched on `@name` + `@namespace`, so each
-one updates in place. Franco confirmed this is the flow he wants (2026-08-23).
+This is the standing instruction for every script, new or changed (Franco, 2026-09-01).
+Land the work on `main`, then open the raw URL of each script you touched. Tampermonkey
+recognises a `.user.js` URL and prompts, to **install** a script it does not know and to
+**update** one it does, matched on `@name` + `@namespace`, so each one lands in place.
+Do not reach for `bin/install.sh` unless Franco asks for it by name.
 
 ```bash
 BASE="https://raw.githubusercontent.com/fgilio/userscripts/main/scripts"
@@ -179,6 +181,8 @@ snapshot is sitting in `backup/`. Running it to update a live browser pushes a s
 The zip is for restoring onto a fresh machine. Nothing else.
 
 ### One script, from a working copy that is not pushed yet
+
+Not the default, and not something to offer. Use it only when Franco asks for it.
 
 ```bash
 bin/install.sh scripts/<name>.user.js     # serves over localhost, Tampermonkey prompts

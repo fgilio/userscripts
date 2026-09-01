@@ -43,6 +43,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 | `laravel-cloud-copy-deployment-logs` | One same-origin `fetch` of the deployment page you are already on, with `credentials: 'same-origin'` | none | Writes to the clipboard, only when you click a copy control |
 | `laravel-cloud-collapsible-permissions` | none | none | Clicks permission checkboxes on your behalf when you press Select all / Clear |
 | `laravel-cloud-firewall-rules-unclip` | none | none | Sets inline flex/overflow styles on existing firewall rule rows and a `title` attribute carrying each rule's own name. Adds nothing else and clicks nothing |
+| `laravel-cloud-firewall-rule-ids` | One same-origin `fetch` of the zone page you are already on, with `credentials: 'same-origin'` | none | Adds one line of text, a rule's own provider id, under each rule name in the table and under the name field of the rule editor. Clicks nothing, and writes to no field |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |
 | `universal-sidebar-toggle` | none | none | Runs in iframes and uses `postMessage` (see below) |
 
@@ -68,6 +69,17 @@ at. Nothing is sent anywhere, and no other URL is ever requested.
 
 The clipboard is written with `navigator.clipboard.write`, never read. The write happens
 only inside a click or Enter handler on one of the injected controls.
+
+### `laravel-cloud-firewall-rule-ids`, the fetch
+
+The id that identifies a rule in a Cloudflare log is in the zone page's own JSON payload,
+under `provider_identifier`. That copy is written once at first paint, so after any
+in-app navigation it describes whichever page you opened directly. So the script uses it
+only while its `url` still matches the address bar, and otherwise re-fetches the zone
+page currently in the address bar and reads the payload out of the response. Same origin,
+your own session cookie, one GET of a page you are looking at. It asks once per set of
+rule names it cannot place, so a re-render costs nothing. Nothing is sent anywhere, and
+no other URL is ever requested.
 
 ### `universal-sidebar-toggle`, frames and `postMessage`
 
