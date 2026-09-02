@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         GitHub Actions — CI + default branch pin
 // @namespace    https://github.com/fgilio
-// @version      1.2.2
+// @version      1.2.3
 // @description  Pins a "CI+main" filter at the top of the GitHub Actions sidebar: one click to the CI workflow runs on the repository default branch.
 // @author       Franco Gilio
 // @icon         https://github.githubassets.com/favicons/favicon.svg
-// @match        https://github.com/*/*/actions*
+// @match        https://github.com/*
 // @run-at       document-idle
 // @noframes
 // @downloadURL https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-actions-ci-branch-pin.user.js
@@ -14,6 +14,12 @@
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
 // ==/UserScript==
+
+// The @match is the whole host rather than the Actions path, because you reach
+// Actions by clicking the repo tab from a PR. That is a Turbo soft nav, and
+// Tampermonkey decides whether to inject at document load, so a path-scoped
+// @match leaves the script absent on the one route it exists for. repoSlug()
+// does the narrowing instead, and apply() is a no-op everywhere else.
 
 (function () {
   'use strict';
