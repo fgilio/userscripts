@@ -36,9 +36,9 @@ function matches(node, selector) {
   const m = selector.match(/^(\.?[\w-]+)?(?:\.([\w-]+))?(?:\[([\w-]+)(?:="([^"]*)")?\])?$/);
   if (!m) throw new Error(`the stub cannot match "${selector}"`);
   const [, head, cls, attr, value] = m;
-  if (head && head.startsWith('.')) { if (!node.classList().includes(head.slice(1))) return false; }
+  if (head && head.startsWith('.')) { if (!node.classes().includes(head.slice(1))) return false; }
   else if (head && node.tag !== head) return false;
-  if (cls && !node.classList().includes(cls)) return false;
+  if (cls && !node.classes().includes(cls)) return false;
   if (attr) {
     const actual = attr in node ? node[attr] : node.getAttribute(attr);
     if (actual === null || actual === undefined) return false;
@@ -51,7 +51,14 @@ function el(tag, props = {}, children = []) {
   const node = {
     nodeType: 1, tag, className: '', attributes: {}, dataset: {}, listeners: {},
     childNodes: [], parentElement: null,
-    classList() { return this.className.split(/\s+/).filter(Boolean); },
+    classes() { return this.className.split(/\s+/).filter(Boolean); },
+    get classList() {
+      const node = this;
+      return {
+        add(name) { if (!node.classes().includes(name)) node.className = `${node.className} ${name}`.trim(); },
+        remove(name) { node.className = node.classes().filter(c => c !== name).join(' '); },
+      };
+    },
     setAttribute(name, value) { this.attributes[name] = String(value); },
     getAttribute(name) {
       if (name === 'data-fg-mark-all') return this.dataset.fgMarkAll ?? null;
@@ -134,6 +141,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
   const submitted = [];
   const assigned = [];
   const observers = [];
+  const timers = [];
   const root = el('body', {}, groups);
 
   const document = {
@@ -166,7 +174,18 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     },
     DOMParser: class { parseFromString(href) { return page(href); } },
     MutationObserver: class { constructor(callback) { observers.push(callback); } observe() {} },
-    setTimeout, clearTimeout,
+    // Short timers (the 50 ms debounce) run for real. Long ones (the arm window)
+    // wait for expire(), so a test decides when the arm lapses.
+    setTimeout(callback, ms) {
+      if (ms < 1000) return setTimeout(callback, ms);
+      const timer = { callback, cleared: false };
+      timers.push(timer);
+      return timer;
+    },
+    clearTimeout(timer) {
+      if (timer && typeof timer === 'object' && 'cleared' in timer) timer.cleared = true;
+      else clearTimeout(timer);
+    },
   };
   context.addEventListener = () => {};
   context.window = context;
@@ -178,9 +197,19 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     warnings, fetched, submitted, assigned,
     ours: () => root.querySelectorAll('form[data-fg-mark-all]'),
     async rerun() { observers.forEach(callback => callback([])); await settle(); },
-    async click(form) {
+    /** One press of the button, which is one submit event. */
+    async press(form) {
       form.listeners.submit.forEach(callback => callback({ preventDefault() {} }));
       await settle();
+    },
+    /** Arm, then confirm: the full two-click gesture. */
+    async click(form) {
+      await this.press(form);
+      await this.press(form);
+    },
+    /** Lets every pending long timer fire, as if the arm window ran out. */
+    expire() {
+      timers.splice(0).filter(t => !t.cleared).forEach(t => t.callback());
     },
   };
 }
@@ -197,7 +226,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     check('the button keeps the native icon', ours[0].querySelector('button').querySelectorAll('svg').length, 1);
     check('it sits right after the native form', ours[0].parentElement.childNodes.indexOf(ours[0]) - 1,
       ours[0].parentElement.childNodes.indexOf(ours[0].parentElement.querySelector('form.js-grouped-notifications-mark-all-read-button')));
-    check('the injected form is not the native one', ours[0].classList().includes('js-grouped-notifications-mark-all-read-button'), false);
+    check('the injected form is not the native one', ours[0].classes().includes('js-grouped-notifications-mark-all-read-button'), false);
 
     await run.rerun();
     await run.rerun();
@@ -213,7 +242,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     check('no fallback navigation on success', run.assigned, []);
 
     await run.click(ours[0]);
-    check('a second click while submitting does nothing', run.fetched.length, 1);
+    check('clicking again while submitting does nothing', run.fetched.length, 1);
   }
 
   {
@@ -302,6 +331,30 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     await settle();
     await run.click(run.ours()[0]);
     check('a select-all form that is not a POST is not trusted', run.submitted, []);
+  }
+
+  {
+    const run = boot({ groups: [group('acme/app', { visible: 2, total: 3 })] });
+    await settle();
+    const form = run.ours()[0];
+    const button = form.querySelector('button');
+
+    await run.press(form);
+    check('the first click only arms: nothing fetched, nothing posted', [run.fetched.length, run.submitted.length], [0, 0]);
+    check('the armed button says what the next click does', button.textContent.trim(), 'Click again to mark 3');
+    check('and turns red', button.classes().includes('btn-danger'), true);
+
+    run.expire();
+    check('the arm lapses back to the resting label', button.textContent.trim(), 'Mark all 3 as done');
+    check('and colour', button.classes().includes('btn-danger'), false);
+
+    await run.press(form);
+    check('a click after the lapse arms again rather than marking', run.submitted.length, 0);
+
+    await run.press(form);
+    check('the confirming click marks', run.submitted.length, 1);
+    run.expire();
+    check('an arm timer cannot relabel a button already marking', button.textContent.trim(), 'Marking…');
   }
 
   console.log(failures ? `\n${failures} failed` : '\nall passed');

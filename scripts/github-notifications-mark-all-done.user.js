@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Notifications: Mark All As Done
 // @namespace    https://github.com/fgilio
-// @version      1.1.0
+// @version      1.2.0
 // @description  On the grouped notifications inbox, adds "Mark all N as done" beside a repo group's "Mark as done" when the group holds more notifications than it shows
 // @author       Franco Gilio
 // @match        https://github.com/*
@@ -49,6 +49,9 @@
 
   const VIEW_ALL = /View all (\d+) notifications?/;
   const ARCHIVE = /\/notifications\/beta\/archive$/;
+
+  /** How long the first click keeps the button armed for the confirming second one. */
+  const ARM_MS = 4000;
 
   const warned = new Set();
   function warnOnce(key, message) {
@@ -156,8 +159,27 @@
     setLabel(button, `Mark all ${count} as done`);
     form.append(button);
 
+    // Two clicks: the first arms the button (red, "Click again"), the second marks.
+    // A stray click on a button that marks more than it shows then costs nothing,
+    // and the arm lapses on its own. No confirm(), per CLAUDE.md golden rule 4.
+    let armed = null;
+    const disarm = () => {
+      clearTimeout(armed);
+      armed = null;
+      button.classList.remove('btn-danger');
+      setLabel(button, `Mark all ${count} as done`);
+    };
+
     form.addEventListener('submit', event => {
       event.preventDefault();
+      if (button.disabled) return;
+      if (!armed) {
+        button.classList.add('btn-danger');
+        setLabel(button, `Click again to mark ${count}`);
+        armed = setTimeout(disarm, ARM_MS);
+        return;
+      }
+      clearTimeout(armed);
       markAll(form, button, link);
     });
     return form;
