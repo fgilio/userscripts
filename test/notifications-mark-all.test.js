@@ -90,6 +90,15 @@ function el(tag, props = {}, children = []) {
       return copy;
     },
     addEventListener(type, callback) { (this.listeners[type] ||= []).push(callback); },
+    closest(selector) {
+      for (let n = this; n && n.nodeType === 1; n = n.parentElement) if (matches(n, selector)) return n;
+      return null;
+    },
+    remove() {
+      const list = this.parentElement.childNodes;
+      list.splice(list.indexOf(this), 1);
+      this.parentElement = null;
+    },
   };
   Object.assign(node, props);
   node.append(...children);
@@ -205,6 +214,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
   return {
     warnings, fetched, submitted, assigned, reloads,
     ours: () => root.querySelectorAll('form[data-fg-mark-all]'),
+    groups: () => root.querySelectorAll('.js-notifications-group').map(g => g.childNodes[0].childNodes[0].textContent),
     async rerun() { observers.forEach(callback => callback([])); await settle(); },
     /** One press of the button, which is one submit event. */
     async press(form) {
@@ -254,7 +264,8 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
       fields: ['authenticity_token=PAGE_TOKEN', 'query=repo:acme/app', 'mark_all=1'],
     }]);
     check('no fallback navigation on success', run.assigned, []);
-    check('reloads the inbox once the mark lands', run.reloads.length, 1);
+    check('removes that group\'s card once the mark lands', run.groups(), ['acme/lib']);
+    check('and does not reload', run.reloads.length, 0);
 
     await run.click(ours[0]);
     check('clicking again while submitting does nothing', run.submitted.length, 1);
@@ -376,7 +387,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     const run = boot({ groups: [group('acme/app', { visible: 2, total: 3 })], postStatus: 422 });
     await settle();
     await run.click(run.ours()[0]);
-    check('a rejected POST does not reload as if it worked', run.reloads.length, 0);
+    check('a rejected POST keeps the card', run.groups(), ['acme/app']);
     check('it opens the full list instead, which shows what is left', run.assigned, ['https://github.com/notifications?query=repo%3Aacme%2Fapp']);
     check('and names the status', run.warnings.some(w => w.includes('422')), true);
   }
@@ -392,7 +403,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     await run.press(run.ours()[0]);
     await run.press(run.ours()[0]);
     await new Promise(resolve => setTimeout(resolve, 1500));
-    check('waits for a queued mark to empty the list before reloading', [run.fetched.length, run.reloads.length], [4, 1]);
+    check('waits for a queued mark to empty the list before removing the card', [run.fetched.length, run.groups().length], [4, 0]);
     check('without warning, since it landed', run.warnings, []);
   }
 
@@ -405,8 +416,10 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     await run.press(run.ours()[0]);
     await run.press(run.ours()[0]);
     await new Promise(resolve => setTimeout(resolve, 3000));
-    check('a mark that never shows up still reloads, after a bounded wait', [run.fetched.length, run.reloads.length], [6, 1]);
-    check('and says the list was not empty yet', run.warnings.some(w => w.includes('still had notifications')), true);
+    check('a mark that never shows up keeps the card, after a bounded wait', [run.fetched.length, run.groups()], [6, ['acme/app']]);
+    check('says so on the button', run.ours()[0].querySelector('button').textContent.trim(), 'Marked, still processing');
+    check('and in the console', run.warnings.some(w => w.includes('still had notifications')), true);
+    check('without reloading', run.reloads.length, 0);
   }
 
   console.log(failures ? `\n${failures} failed` : '\nall passed');

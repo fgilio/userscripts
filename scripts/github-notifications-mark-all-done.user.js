@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Notifications: Mark All As Done
 // @namespace    https://github.com/fgilio
-// @version      1.3.0
+// @version      1.4.0
 // @description  On the grouped notifications inbox, adds "Mark all N as done" beside a repo group's "Mark as done" when the group holds more notifications than it shows
 // @author       Franco Gilio
 // @match        https://github.com/*
@@ -21,8 +21,9 @@
 // matching" form, which posts `query=repo:owner/name` plus `mark_all=1` to the same
 // archive endpoint and lets the server resolve the whole set. On click, this fetches
 // that page, takes that exact form (token and query), and posts it with fetch, the
-// way GitHub's own bulk-action JS does, then reloads the inbox. No id scraping, no
-// pagination.
+// way GitHub's own bulk-action JS does, then removes the group's card in place. No
+// id scraping, no pagination, no reload, so the scroll position stays. The sidebar
+// counts stay stale until the next manual reload, a deliberate trade.
 //
 // Why fetch and not form.submit(): that form belongs to GitHub's bulk-action JS
 // (`js-notification-bulk-action`), and the endpoint answers it with an empty body.
@@ -58,7 +59,7 @@
   /** How long the first click keeps the button armed for the confirming second one. */
   const ARM_MS = 4000;
 
-  /** How long to wait for a queued (202) mark to land before reloading anyway. */
+  /** How long to wait for a queued (202) mark to land before giving up on confirming it. */
   const CLEAR_TRIES = 5;
   const CLEAR_WAIT_MS = 500;
 
@@ -122,15 +123,15 @@
 
   /**
    * The archive endpoint answers 202 Accepted: the mark may still be queued. Wait,
-   * boundedly, for the group's list to empty, so the reload shows the result rather
-   * than the group it just marked.
+   * boundedly, for the group's list to empty, so the card only goes once the
+   * notifications it stands for are really done.
    */
   async function waitUntilCleared(href) {
     for (let attempt = 0; attempt < CLEAR_TRIES; attempt++) {
-      if (await rowsLeft(href) === 0) return;
+      if (await rowsLeft(href) === 0) return true;
       await new Promise(resolve => setTimeout(resolve, CLEAR_WAIT_MS));
     }
-    console.warn(`${TAG} the "View all" list still had notifications after the mark. GitHub may still be processing it. Reloading anyway.`);
+    return false;
   }
 
   async function markAll(form, button, link) {
@@ -165,9 +166,13 @@
       });
       if (!posted.ok) throw new Error(`GitHub answered ${posted.status} to the mark-all request`);
 
-      // A reload drops the group here and refreshes the sidebar counts.
-      await waitUntilCleared(link.href);
-      location.reload();
+      if (await waitUntilCleared(link.href)) {
+        form.closest(SEL.group)?.remove();
+        return;
+      }
+      // Accepted but not visible yet: keep the card, so nothing disappears unconfirmed.
+      console.warn(`${TAG} the "View all" list still had notifications after the mark. GitHub may still be processing it. Reload to check.`);
+      setLabel(button, 'Marked, still processing');
     } catch (error) {
       // Fail visible: land on the full list, where GitHub's own select-all still works.
       console.warn(`${TAG} ${error.message}. Opening the full list instead.`);
