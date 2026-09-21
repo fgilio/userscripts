@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Notifications: Mark All As Done
 // @namespace    https://github.com/fgilio
-// @version      1.2.0
+// @version      1.3.0
 // @description  On the grouped notifications inbox, adds "Mark all N as done" beside a repo group's "Mark as done" when the group holds more notifications than it shows
 // @author       Franco Gilio
 // @match        https://github.com/*
@@ -20,9 +20,14 @@
 // How this closes the gap: the "View all" page carries GitHub's own "select all
 // matching" form, which posts `query=repo:owner/name` plus `mark_all=1` to the same
 // archive endpoint and lets the server resolve the whole set. On click, this fetches
-// that page, takes that exact form (token and query), and submits it natively. No
-// id scraping, no pagination, and the page reloads just as it does after the native
-// button.
+// that page, takes that exact form (token and query), and posts it with fetch, the
+// way GitHub's own bulk-action JS does, then reloads the inbox. No id scraping, no
+// pagination.
+//
+// Why fetch and not form.submit(): that form belongs to GitHub's bulk-action JS
+// (`js-notification-bulk-action`), and the endpoint answers it with an empty body.
+// A native submit navigates to that body, a blank /notifications/beta/archive page,
+// even though the mark succeeded (seen live 2026-09-21: 202 Accepted, empty body).
 //
 // Scope: a filtered inbox (e.g. ?query=is:unread) keeps its filter in each group's
 // "View all" link ("repo:owner/name is:unread") and in the select-all form there,
@@ -52,6 +57,10 @@
 
   /** How long the first click keeps the button armed for the confirming second one. */
   const ARM_MS = 4000;
+
+  /** How long to wait for a queued (202) mark to land before reloading anyway. */
+  const CLEAR_TRIES = 5;
+  const CLEAR_WAIT_MS = 500;
 
   const warned = new Set();
   function warnOnce(key, message) {
@@ -104,6 +113,26 @@
     return null;
   }
 
+  /** Rows on a notifications list page, parsed from its HTML. */
+  async function rowsLeft(href) {
+    const response = await fetch(href, { credentials: 'same-origin' });
+    const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+    return doc.querySelectorAll('li.notifications-list-item').length;
+  }
+
+  /**
+   * The archive endpoint answers 202 Accepted: the mark may still be queued. Wait,
+   * boundedly, for the group's list to empty, so the reload shows the result rather
+   * than the group it just marked.
+   */
+  async function waitUntilCleared(href) {
+    for (let attempt = 0; attempt < CLEAR_TRIES; attempt++) {
+      if (await rowsLeft(href) === 0) return;
+      await new Promise(resolve => setTimeout(resolve, CLEAR_WAIT_MS));
+    }
+    console.warn(`${TAG} the "View all" list still had notifications after the mark. GitHub may still be processing it. Reloading anyway.`);
+  }
+
   async function markAll(form, button, link) {
     if (button.disabled) return;
     button.disabled = true;
@@ -123,21 +152,22 @@
 
       // Post exactly the fields findMarkAllForm() checked, built here rather than
       // copied, so a field it validated can never be left out of the request.
-      form.setAttribute('action', source.getAttribute('action'));
-      const fields = {
-        authenticity_token: source.querySelector('input[name="authenticity_token"]').value,
-        query,
-        mark_all: '1',
-      };
-      for (const [name, value] of Object.entries(fields)) {
-        const field = document.createElement('input');
-        field.type = 'hidden';
-        field.name = name;
-        field.value = value;
-        form.append(field);
-      }
-      // HTMLFormElement.submit() skips the submit event, so this cannot loop.
-      form.submit();
+      const body = new FormData();
+      body.append('authenticity_token', source.querySelector('input[name="authenticity_token"]').value);
+      body.append('query', query);
+      body.append('mark_all', '1');
+
+      const posted = await fetch(new URL(source.getAttribute('action'), location.href), {
+        method: 'POST',
+        body,
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (!posted.ok) throw new Error(`GitHub answered ${posted.status} to the mark-all request`);
+
+      // A reload drops the group here and refreshes the sidebar counts.
+      await waitUntilCleared(link.href);
+      location.reload();
     } catch (error) {
       // Fail visible: land on the full list, where GitHub's own select-all still works.
       console.warn(`${TAG} ${error.message}. Opening the full list instead.`);
@@ -147,7 +177,6 @@
 
   function buildForm(native, link, count) {
     const form = document.createElement('form');
-    form.method = 'post';
     form.setAttribute('action', native.getAttribute('action'));
     form.className = 'd-none d-md-block ml-2';
     form.dataset.turbo = 'false';

@@ -4,7 +4,7 @@
 //
 // No dependencies and no test framework, matching the rest of the repo. The script
 // is evaluated against a DOM stub real enough that apply() finds groups, clones the
-// native button, and a click fetches the "View all" page and submits a form. The
+// native button, and a click fetches the "View all" page and POSTs the mark. The
 // assertions sit on what would reach GitHub: the action and the posted fields. A
 // wrong query there marks the wrong notifications, so that is where the cases bite.
 const fs = require('fs');
@@ -119,8 +119,9 @@ function group(repo, { visible, total, query = `repo:${repo}` }) {
 }
 
 /** The "View all" page: the per-row archive forms, plus GitHub's own select-all form. */
-function viewAllPage(query, { token = 'PAGE_TOKEN', decoy = true, method = 'post', queryType = 'hidden' } = {}) {
+function viewAllPage(query, { token = 'PAGE_TOKEN', decoy = true, method = 'post', queryType = 'hidden', rows = 0 } = {}) {
   const root = el('html');
+  for (let i = 0; i < rows; i++) root.append(el('li', { className: 'notifications-list-item' }));
   root.append(el('form', { attributes: { action: '/notifications/beta/archive' } }, [input('authenticity_token', 'ROW'), input('notification_ids[]', 'NT_row')]));
   if (decoy) {
     root.append(el('form', { attributes: { action: '/notifications/beta/archive', method: 'post' } }, [
@@ -135,11 +136,12 @@ function viewAllPage(query, { token = 'PAGE_TOKEN', decoy = true, method = 'post
   return root;
 }
 
-function boot({ path = '/notifications', search = '', groups, page = () => viewAllPage('repo:acme/app'), status = 200 }) {
+function boot({ path = '/notifications', search = '', groups, page = () => viewAllPage('repo:acme/app'), status = 200, postStatus = 200 }) {
   const warnings = [];
   const fetched = [];
   const submitted = [];
   const assigned = [];
+  const reloads = [];
   const observers = [];
   const timers = [];
   const root = el('body', {}, groups);
@@ -149,15 +151,9 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     addEventListener() {},
     createElement: tag => {
       const node = el(tag);
-      if (tag === 'form') {
-        node.submit = function () {
-          submitted.push({
-            method: this.method,
-            action: this.getAttribute('action'),
-            fields: this.querySelectorAll('input').map(i => `${i.name}=${i.value}`),
-          });
-        };
-      }
+      // A native submit navigates to the endpoint's empty body: the blank page this
+      // script once produced. Recorded so a regression to it fails loudly.
+      if (tag === 'form') node.submit = () => submitted.push('native form.submit()');
       return node;
     },
     querySelectorAll: selector => root.querySelectorAll(selector),
@@ -166,9 +162,22 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
   const context = {
     document,
     console: { warn: (...args) => warnings.push(args.join(' ')), error: (...args) => warnings.push(args.join(' ')) },
-    location: { pathname: path, href: `https://github.com${path}${search}`, assign: href => assigned.push(href) },
-    URL,
-    fetch(href) {
+    location: {
+      pathname: path, href: `https://github.com${path}${search}`,
+      assign: href => assigned.push(href), reload: () => reloads.push(true),
+    },
+    URL, FormData,
+    fetch(href, init = {}) {
+      if (init.method === 'POST') {
+        submitted.push({
+          method: init.method,
+          action: new URL(String(href)).pathname,
+          credentials: init.credentials,
+          xhr: init.headers?.['X-Requested-With'],
+          fields: [...init.body].map(([name, value]) => `${name}=${value}`),
+        });
+        return Promise.resolve({ ok: postStatus === 200, status: postStatus });
+      }
       fetched.push(href);
       return Promise.resolve({ ok: status === 200, status, text: () => Promise.resolve(href) });
     },
@@ -194,7 +203,7 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
   vm.runInContext(src, context);
 
   return {
-    warnings, fetched, submitted, assigned,
+    warnings, fetched, submitted, assigned, reloads,
     ours: () => root.querySelectorAll('form[data-fg-mark-all]'),
     async rerun() { observers.forEach(callback => callback([])); await settle(); },
     /** One press of the button, which is one submit event. */
@@ -233,16 +242,22 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     check('idempotent across re-runs', run.ours().length, 1);
 
     await run.click(ours[0]);
-    check('fetches the group\'s "View all" page', run.fetched, ['https://github.com/notifications?query=repo%3Aacme%2Fapp']);
+    check('fetches the group\'s "View all" page, then once more to see it emptied', run.fetched, [
+      'https://github.com/notifications?query=repo%3Aacme%2Fapp',
+      'https://github.com/notifications?query=repo%3Aacme%2Fapp',
+    ]);
     check('posts GitHub\'s own select-all form for that query, not the wider decoy', run.submitted, [{
-      method: 'post',
+      method: 'POST',
       action: '/notifications/beta/archive',
+      credentials: 'same-origin',
+      xhr: 'XMLHttpRequest',
       fields: ['authenticity_token=PAGE_TOKEN', 'query=repo:acme/app', 'mark_all=1'],
     }]);
     check('no fallback navigation on success', run.assigned, []);
+    check('reloads the inbox once the mark lands', run.reloads.length, 1);
 
     await run.click(ours[0]);
-    check('clicking again while submitting does nothing', run.fetched.length, 1);
+    check('clicking again while submitting does nothing', run.submitted.length, 1);
   }
 
   {
@@ -355,6 +370,43 @@ function boot({ path = '/notifications', search = '', groups, page = () => viewA
     check('the confirming click marks', run.submitted.length, 1);
     run.expire();
     check('an arm timer cannot relabel a button already marking', button.textContent.trim(), 'Marking…');
+  }
+
+  {
+    const run = boot({ groups: [group('acme/app', { visible: 2, total: 3 })], postStatus: 422 });
+    await settle();
+    await run.click(run.ours()[0]);
+    check('a rejected POST does not reload as if it worked', run.reloads.length, 0);
+    check('it opens the full list instead, which shows what is left', run.assigned, ['https://github.com/notifications?query=repo%3Aacme%2Fapp']);
+    check('and names the status', run.warnings.some(w => w.includes('422')), true);
+  }
+
+  {
+    // A queued mark: the list still shows rows on the first two looks, then empties.
+    let looks = 0;
+    const run = boot({
+      groups: [group('acme/app', { visible: 2, total: 3 })],
+      page: () => viewAllPage('repo:acme/app', { rows: looks++ < 3 ? 3 : 0 }),
+    });
+    await settle();
+    await run.press(run.ours()[0]);
+    await run.press(run.ours()[0]);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    check('waits for a queued mark to empty the list before reloading', [run.fetched.length, run.reloads.length], [4, 1]);
+    check('without warning, since it landed', run.warnings, []);
+  }
+
+  {
+    const run = boot({
+      groups: [group('acme/app', { visible: 2, total: 3 })],
+      page: () => viewAllPage('repo:acme/app', { rows: 3 }),
+    });
+    await settle();
+    await run.press(run.ours()[0]);
+    await run.press(run.ours()[0]);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    check('a mark that never shows up still reloads, after a bounded wait', [run.fetched.length, run.reloads.length], [6, 1]);
+    check('and says the list was not empty yet', run.warnings.some(w => w.includes('still had notifications')), true);
   }
 
   console.log(failures ? `\n${failures} failed` : '\nall passed');
