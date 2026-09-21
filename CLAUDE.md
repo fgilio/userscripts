@@ -162,6 +162,16 @@ BASE="https://raw.githubusercontent.com/fgilio/userscripts/main/scripts"
 for f in $(git ls-files 'scripts/*.user.js' | xargs -n1 basename); do open "$BASE/$f"; done
 ```
 
+**Wait for the CDN first.** `raw.githubusercontent.com` caches for 5 minutes
+(`cache-control: max-age=300`), so a URL opened right after the push can still serve the
+previous `@version`, and Tampermonkey offers a no-op "update". Poll until the new
+version is served, then open:
+
+```bash
+f=scripts/<name>.user.js; v=$(grep -m1 '@version' "$f" | awk '{print $3}')
+until curl -s "$BASE/$(basename "$f")" | grep -q "@version *$v\$"; do sleep 15; done
+```
+
 One `open` per script, one click each, and nothing else touched. Three reasons it beats
 every other route:
 
