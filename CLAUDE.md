@@ -169,8 +169,14 @@ version is served, then open:
 
 ```bash
 f=scripts/<name>.user.js; v=$(grep -m1 '@version' "$f" | awk '{print $3}')
-until curl -s "$BASE/$(basename "$f")" | grep -q "@version *$v\$"; do sleep 15; done
+until curl -s "$BASE/$(basename "$f")?v=$v" | grep -q "@version *$v\$"; do sleep 15; done
+open "$BASE/$(basename "$f")?v=$v"
 ```
+
+The `?v=` is not optional. Chrome keeps its own copy of the URL for those same 5
+minutes, so re-opening a URL it fetched recently shows the old version even once the
+CDN serves the new one. Tampermonkey still treats `…user.js?v=…` as an install, and
+the query never reaches `@updateURL`, so later automatic updates are unaffected.
 
 One `open` per script, one click each, and nothing else touched. Three reasons it beats
 every other route:
