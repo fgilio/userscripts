@@ -94,7 +94,7 @@ function input(name, value) {
 }
 
 /** One repo group as github.com/notifications renders it, grouped by repository. */
-function group(repo, { visible, total }) {
+function group(repo, { visible, total, query = `repo:${repo}` }) {
   const ids = Array.from({ length: visible }, (_, i) => input('notification_ids[]', `NT_${repo}_${i}`));
   const button = el('button', { type: 'submit', className: 'btn btn-sm' }, [el('span', {}, [el('svg')]), '\n  Mark as done\n']);
   const native = el('form', {
@@ -105,30 +105,30 @@ function group(repo, { visible, total }) {
 
   const children = [header];
   if (total > visible) {
-    const href = `/notifications?query=repo%3A${encodeURIComponent(repo)}`;
+    const href = `/notifications?query=${encodeURIComponent(query)}`;
     children.push(el('a', { attributes: { href }, href: `https://github.com${href}` }, [`View all ${total} notifications`]));
   }
   return el('div', { className: 'Box js-notifications-group' }, children);
 }
 
 /** The "View all" page: the per-row archive forms, plus GitHub's own select-all form. */
-function viewAllPage(query, { token = 'PAGE_TOKEN', decoy = true } = {}) {
+function viewAllPage(query, { token = 'PAGE_TOKEN', decoy = true, method = 'post', queryType = 'hidden' } = {}) {
   const root = el('html');
   root.append(el('form', { attributes: { action: '/notifications/beta/archive' } }, [input('authenticity_token', 'ROW'), input('notification_ids[]', 'NT_row')]));
   if (decoy) {
-    root.append(el('form', { attributes: { action: '/notifications/beta/archive' } }, [
+    root.append(el('form', { attributes: { action: '/notifications/beta/archive', method: 'post' } }, [
       input('authenticity_token', 'WIDE'), input('query', ''), input('mark_all', '1'),
     ]));
   }
   if (query !== null) {
-    root.append(el('form', { attributes: { action: '/notifications/beta/archive' } }, [
-      input('authenticity_token', token), input('query', query), input('mark_all', '1'),
+    root.append(el('form', { attributes: { action: '/notifications/beta/archive', method } }, [
+      input('authenticity_token', token), Object.assign(input('query', query), { type: queryType }), input('mark_all', '1'),
     ]));
   }
   return root;
 }
 
-function boot({ path = '/notifications', groups, page = () => viewAllPage('repo:acme/app'), status = 200 }) {
+function boot({ path = '/notifications', search = '', groups, page = () => viewAllPage('repo:acme/app'), status = 200 }) {
   const warnings = [];
   const fetched = [];
   const submitted = [];
@@ -144,6 +144,7 @@ function boot({ path = '/notifications', groups, page = () => viewAllPage('repo:
       if (tag === 'form') {
         node.submit = function () {
           submitted.push({
+            method: this.method,
             action: this.getAttribute('action'),
             fields: this.querySelectorAll('input').map(i => `${i.name}=${i.value}`),
           });
@@ -157,7 +158,7 @@ function boot({ path = '/notifications', groups, page = () => viewAllPage('repo:
   const context = {
     document,
     console: { warn: (...args) => warnings.push(args.join(' ')), error: (...args) => warnings.push(args.join(' ')) },
-    location: { pathname: path, href: `https://github.com${path}`, assign: href => assigned.push(href) },
+    location: { pathname: path, href: `https://github.com${path}${search}`, assign: href => assigned.push(href) },
     URL,
     fetch(href) {
       fetched.push(href);
@@ -205,6 +206,7 @@ function boot({ path = '/notifications', groups, page = () => viewAllPage('repo:
     await run.click(ours[0]);
     check('fetches the group\'s "View all" page', run.fetched, ['https://github.com/notifications?query=repo%3Aacme%2Fapp']);
     check('posts GitHub\'s own select-all form for that query, not the wider decoy', run.submitted, [{
+      method: 'post',
       action: '/notifications/beta/archive',
       fields: ['authenticity_token=PAGE_TOKEN', 'query=repo:acme/app', 'mark_all=1'],
     }]);
@@ -260,6 +262,46 @@ function boot({ path = '/notifications', groups, page = () => viewAllPage('repo:
     await run.rerun();
     check('a group missing its native form is skipped', run.ours().length, 1);
     check('and warns once, naming the selector', run.warnings.filter(w => w.includes('js-grouped-notifications-mark-all-read-button')).length, 1);
+  }
+
+  {
+    const run = boot({
+      search: '?query=is%3Aunread',
+      groups: [group('acme/app', { visible: 2, total: 3, query: 'repo:acme/app is:unread' })],
+      page: () => viewAllPage('repo:acme/app is:unread'),
+    });
+    await settle();
+    await run.click(run.ours()[0]);
+    check('a filtered inbox posts the filtered query', run.submitted.map(s => s.fields[1]), ['query=repo:acme/app is:unread']);
+  }
+
+  {
+    const run = boot({
+      search: '?query=is%3Aunread',
+      groups: [group('acme/app', { visible: 2, total: 3 })],
+      page: () => viewAllPage('repo:acme/app'),
+    });
+    await settle();
+    await run.click(run.ours()[0]);
+    check('a "View all" link that drops the inbox filter posts nothing', run.submitted, []);
+    check('and never fetches', run.fetched, []);
+    check('and says which query', run.warnings.some(w => w.includes('drops a filter')), true);
+  }
+
+  {
+    const run = boot({ groups: [group('acme/app', { visible: 2, total: 3 })], page: () => viewAllPage('repo:acme/app', { queryType: 'text' }) });
+    await settle();
+    await run.click(run.ours()[0]);
+    check('the validated query is posted even when its input is not hidden', run.submitted.map(s => s.fields), [
+      ['authenticity_token=PAGE_TOKEN', 'query=repo:acme/app', 'mark_all=1'],
+    ]);
+  }
+
+  {
+    const run = boot({ groups: [group('acme/app', { visible: 2, total: 3 })], page: () => viewAllPage('repo:acme/app', { method: 'get', decoy: false }) });
+    await settle();
+    await run.click(run.ours()[0]);
+    check('a select-all form that is not a POST is not trusted', run.submitted, []);
   }
 
   console.log(failures ? `\n${failures} failed` : '\nall passed');

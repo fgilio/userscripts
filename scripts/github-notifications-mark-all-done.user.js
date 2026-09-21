@@ -1,10 +1,10 @@
 // ==UserScript==
 // @name         GitHub Notifications: Mark All As Done
 // @namespace    https://github.com/fgilio
-// @version      1.0.0
+// @version      1.1.0
 // @description  On the grouped notifications inbox, adds "Mark all N as done" beside a repo group's "Mark as done" when the group holds more notifications than it shows
 // @author       Franco Gilio
-// @match        https://github.com/notifications*
+// @match        https://github.com/*
 // @icon         https://github.githubassets.com/favicons/favicon.svg
 // @run-at       document-idle
 // @noframes
@@ -23,6 +23,15 @@
 // that page, takes that exact form (token and query), and submits it natively. No
 // id scraping, no pagination, and the page reloads just as it does after the native
 // button.
+//
+// Scope: a filtered inbox (e.g. ?query=is:unread) keeps its filter in each group's
+// "View all" link ("repo:owner/name is:unread") and in the select-all form there,
+// verified 2026-09-21. The script still refuses to post when the link drops a term
+// of the inbox's own query, so a GitHub change cannot widen the set silently.
+//
+// @match is all of github.com, not /notifications*, because a page reached by soft
+// navigation never loads a script whose @match missed the page the tab started on.
+// ROUTE keeps it idle everywhere else.
 
 (function () {
   'use strict';
@@ -57,6 +66,17 @@
     return (new URL(link.getAttribute('href'), location.href).searchParams.get('query') || '').trim();
   }
 
+  /** Whitespace-separated terms, so "is:unread repo:x" and "repo:x is:unread" compare equal. */
+  function terms(query) {
+    return (query || '').trim().split(/\s+/).filter(Boolean);
+  }
+
+  /** Every filter of the inbox on screen must survive into the group's query. */
+  function keepsInboxFilter(linkQuery) {
+    const kept = new Set(terms(linkQuery));
+    return terms(new URL(location.href).searchParams.get('query')).every(term => kept.has(term));
+  }
+
   /** Swaps the button's label text, leaving the check icon beside it alone. */
   function setLabel(button, text) {
     const node = [...button.childNodes].reverse().find(n => n.nodeType === 3 && n.textContent.trim());
@@ -72,6 +92,7 @@
   function findMarkAllForm(doc, query) {
     for (const form of doc.querySelectorAll('form')) {
       if (!ARCHIVE.test(form.getAttribute('action') || '')) continue;
+      if ((form.getAttribute('method') || '').toLowerCase() !== 'post') continue;
       if (form.querySelector('input[name="mark_all"]')?.value !== '1') continue;
       if (!form.querySelector('input[name="authenticity_token"]')?.value) continue;
       if ((form.querySelector('input[name="query"]')?.value || '').trim() !== query) continue;
@@ -88,6 +109,7 @@
     try {
       const query = queryOf(link);
       if (!query) throw new Error('the "View all" link carries no query');
+      if (!keepsInboxFilter(query)) throw new Error(`the "View all" query "${query}" drops a filter of this inbox`);
 
       const response = await fetch(link.href, { credentials: 'same-origin' });
       if (!response.ok) throw new Error(`the "View all" page answered ${response.status}`);
@@ -96,13 +118,20 @@
       const source = findMarkAllForm(doc, query);
       if (!source) throw new Error(`no archive form with mark_all=1 and query "${query}" on the "View all" page`);
 
+      // Post exactly the fields findMarkAllForm() checked, built here rather than
+      // copied, so a field it validated can never be left out of the request.
       form.setAttribute('action', source.getAttribute('action'));
-      for (const input of source.querySelectorAll('input[type="hidden"]')) {
-        const copy = document.createElement('input');
-        copy.type = 'hidden';
-        copy.name = input.name;
-        copy.value = input.value;
-        form.append(copy);
+      const fields = {
+        authenticity_token: source.querySelector('input[name="authenticity_token"]').value,
+        query,
+        mark_all: '1',
+      };
+      for (const [name, value] of Object.entries(fields)) {
+        const field = document.createElement('input');
+        field.type = 'hidden';
+        field.name = name;
+        field.value = value;
+        form.append(field);
       }
       // HTMLFormElement.submit() skips the submit event, so this cannot loop.
       form.submit();
