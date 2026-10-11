@@ -8,9 +8,9 @@ modal with no "select all". Two dashboards that clearly know about each other an
 don't link to each other. A sidebar with a keyboard shortcut on one site and nothing on
 the next nine. None of it is hard to fix, which is the annoying part.
 
-Seven of these are GitHub, five are Laravel Cloud, and one is a single sidebar toggle
-that behaves the same way across ten sites that each hide their sidebar behind a
-different button. They're built for my habits, so treat the list as a menu rather than a
+Seven of these are GitHub, five are Laravel Cloud, one is Amazon, and one is a single
+sidebar toggle that behaves the same way across ten sites that each hide their sidebar
+behind a different button. They're built for my habits, so treat the list as a menu rather than a
 suite.
 
 ## Install
@@ -52,6 +52,7 @@ Changing anything locally, or want the whole set at once? See
 | [`laravel-cloud-collapsible-permissions`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-collapsible-permissions.user.js) | `cloud.laravel.com/*` | API token modal: collapsible permission categories, Select all / Clear with a live count, and a search box over the Resources list |
 | [`laravel-cloud-firewall-rules-unclip`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-firewall-rules-unclip.user.js) | `cloud.laravel.com/*` | On edge network zone pages, truncates long firewall rule names with an ellipsis (full name on hover) so the events count stays visible, and locks the rules cards against the stray horizontal scroll that hides the action column. Idle on every other page |
 | [`laravel-cloud-firewall-rule-ids`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-firewall-rule-ids.user.js) | `cloud.laravel.com/*` | On edge network zone pages, prints each custom, rate limit and cache rule's provider id under its name, in the rules table and under the name field of the rule editor, so a rule id read off a Cloudflare log names a rule you can see. Idle on every other page |
+| [`amazon-image-viewer-arrow-keys`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/amazon-image-viewer-arrow-keys.user.js) | `amazon.{es,com,co.uk,de,fr,it}` product pages | In the full-size image viewer (click the product photo), Left and Right arrows step through the images, wrapping at both ends. Leaves the arrows alone on the Videos tab, in text fields, and when the viewer is closed |
 | [`universal-sidebar-toggle`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/universal-sidebar-toggle.user.js) | 10 sites | Hyper+S (⌘⇧⌃⌥S) toggles the sidebar. Per-site selector config. Handles Closure Library and pointer-event quirks |
 
 Retired scripts are in `scripts/retired/` with the reason recorded (see that folder's README).
@@ -77,6 +78,7 @@ the observer simply runs again).
 | `laravel-cloud-firewall-rules-unclip` | medium | Anchors on each rule row's dnd-kit drag handle (`aria-roledescription="sortable"`, durable), then walks a fixed shape: `.group` row, a flex strip, a 3-child `flex-1` cell. Warns once and leaves the table native when the shape changes |
 | `laravel-cloud-firewall-rule-ids` | medium | The same drag-handle anchor and row shape as `-unclip`, plus the rule payload keyed on `firewallRules` / `rateLimitRules` / `cacheRules` and paired to a row by rule name. In the editor it anchors on `input#rule_name` and the `data-slot` field wrapper around it. Prints nothing, and says so once, when any of that stops matching |
 | `github-notifications-mark-all-done` | low | `form.js-grouped-notifications-mark-all-read-button`, the "View all N notifications" link text, and an archive form with `mark_all=1` and a matching `query` on the View all page. A miss adds no button, or on click opens the full list instead of posting |
+| `amazon-image-viewer-arrow-keys` | low | `#ivMain`, `#ivThumbs .ivThumb[id^="ivImage_"]` and its `selected` class, ids Amazon's viewer has carried for years. A miss with the viewer open warns once and leaves the arrows native |
 | `universal-sidebar-toggle` | low | Per-site `data-testid` / `aria-label` selectors, several per site as fallbacks |
 | `github-actions-ci-branch-pin` | low | Primer classes (`ActionListItem`) are stable. Also parses `"defaultBranch"` out of the repo home page, with the refs endpoint as fallback |
 | `github-auto-expand-single-check-group` | low | `details.checks-list-item` |

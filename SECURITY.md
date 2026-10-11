@@ -46,6 +46,7 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 | `laravel-cloud-firewall-rules-unclip` | none | none | Sets inline flex/overflow styles on existing firewall rule rows and a `title` attribute carrying each rule's own name. Adds nothing else and clicks nothing |
 | `laravel-cloud-firewall-rule-ids` | One same-origin `fetch` of the zone page you are already on, with `credentials: 'same-origin'` | none | Adds one line of text, a rule's own provider id, under each rule name in the table and under the name field of the rule editor. Clicks nothing, and writes to no field |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |
+| `amazon-image-viewer-arrow-keys` | none | none | Listens for Left / Right arrow keys and clicks the viewer's own previous / next thumbnail. Acts only while the image viewer is open |
 | `universal-sidebar-toggle` | none | none | Runs in iframes and uses `postMessage` (see below) |
 
 ### `github-actions-ci-branch-pin` and `credentials: 'include'`
