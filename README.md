@@ -8,7 +8,7 @@ modal with no "select all". Two dashboards that clearly know about each other an
 don't link to each other. A sidebar with a keyboard shortcut on one site and nothing on
 the next nine. None of it is hard to fix, which is the annoying part.
 
-Seven of these are GitHub, five are Laravel Cloud, one is Amazon, and one is a single
+Eight of these are GitHub, five are Laravel Cloud, one is Amazon, and one is a single
 sidebar toggle that behaves the same way across ten sites that each hide their sidebar
 behind a different button. They're built for my habits, so treat the list as a menu rather than a
 suite.
@@ -46,6 +46,7 @@ Changing anything locally, or want the whole set at once? See
 | [`github-auto-expand-single-check-group`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-auto-expand-single-check-group.user.js) | `github.com/*/*/pull/*` | On the PR Checks tab, expands every workflow when there are three or fewer. Above three, expands the one named `CI` plus any workflow holding a failure, whatever that one is called, falling back to all of them when neither exists |
 | [`github-pr-checks-signal-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-checks-signal-first.user.js) | `github.com/*/*/pull/*` | On the PR Checks tab, floats whatever needs attention to the top: workflows are ordered by their worst job, jobs by their own status, and skipped jobs sink to the bottom dimmed. A single failure buried at row 16 of 17 ends up first |
 | [`github-pr-commits-newest-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-commits-newest-first.user.js) | `github.com/*/*/pull/*` | Reverses the PR Commits tab so the newest commit and newest day are on top |
+| [`github-pr-omnibox-shortcut`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-omnibox-shortcut.user.js) | `www.google.com/search` | Type `mentat#369` or `mentat/369` in Chrome's address bar and land on that PR in `publicala` instead of a Google search. `owner/repo#N` works for any other owner, and an issue number lands on the issue. Only address bar searches are redirected (Chrome tags them `sourceid=chrome`), never Google's own search box. Quote the query to search for it anyway |
 | [`github-notifications-mark-all-done`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-notifications-mark-all-done.user.js) | `github.com/*` | In the inbox grouped by repository, adds **Mark all N as done** beside a group's **Mark as done** when the group shows fewer notifications than it holds. The native button only marks the rows on screen. This one submits GitHub's own "select all matching" form from the group's *View all* page, so the server marks the whole set in one request. Two clicks: the first arms it (red, "Click again to mark N", lapses after 4 s), the second marks, then the card disappears without a reload. Keeps the inbox filter (`is:unread`, etc.), and refuses to post if the group query drops one. Idle on every other page |
 | [`laravel-cloud-nightwatch-linker`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-nightwatch-linker.user.js) | `cloud.laravel.com`, `nightwatch.laravel.com` | Native-looking cross-links between a Laravel Cloud environment and its Nightwatch dashboard. Learns the pairing once, then remembers it |
 | [`laravel-cloud-copy-deployment-logs`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/laravel-cloud-copy-deployment-logs.user.js) | `cloud.laravel.com/*` | A copy button on every deployment step and on each of the two log sections. Copies the log as plain text without expanding anything, including the technical failure cause the page never shows. Idle on every other page |
@@ -83,6 +84,7 @@ the observer simply runs again).
 | `github-actions-ci-branch-pin` | low | Primer classes (`ActionListItem`) are stable. Also parses `"defaultBranch"` out of the repo home page, with the refs endpoint as fallback |
 | `github-auto-expand-single-check-group` | low | `details.checks-list-item` |
 | `github-pr-checks-signal-first` | medium | Reads status from the `aria-label` on each job's icon (`This job failed`, `This job was skipped`), which is durable. Reorders the `div.js-socket-channel` wrappers GitHub live-updates over, which is the risky half |
+| `github-pr-omnibox-shortcut` | low | Reads only the `q` and `sourceid` query parameters. Breaks if Chrome stops tagging address bar searches with `sourceid=chrome`, or uses a Google host other than `www.google.com` |
 | `github-tab-title-numbers` | low | Reads the number from the URL. Only the Actions-run label is scraped |
 
 ## Working on this repo
