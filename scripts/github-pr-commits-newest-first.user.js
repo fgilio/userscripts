@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub PR Commits — Newest First
 // @namespace    https://github.com/
-// @version      1.4.0
+// @version      1.5.0
 // @description  Reverse the PR Commits tab so newest commits (and newest day) appear on top
 // @author       Franco Gilio
 // @match        https://github.com/*/*/pull/*
@@ -17,8 +17,11 @@
   'use strict';
 
   const TAG = '[pr-commits]';
-  const TIMELINE = 'div.prc-Timeline-Timeline-awSoC';
-  const COMMIT_UL = 'ul.ListView-module__ul__uMK30';
+  // GitHub's own test ids, stable across the 2026-10 move from a <div> timeline
+  // with hashed ListView classes to a Primer React <ol>. The hashed classes broke
+  // this script that day, so neither list is found by its class any more.
+  const DAY_TITLE = 'h3[data-testid="commit-group-title"]';
+  const COMMIT_ROW = 'li[data-testid="commit-row-item"]';
 
   const warned = new Set();
   function need(root, selector, what) {
@@ -45,10 +48,34 @@
   // that arrives later sorts ahead of everything already stamped.
   const ORDER = 'fgOrder';
 
+  // Classes that only the first child carries, captured the first time a
+  // container is seen. The Primer timeline marks its first day with one
+  // (`top__…`, it trims the connector line above the badge), so the mark must
+  // follow whichever day is on top, or the line pokes out above the newest day
+  // and a gap opens above the oldest.
+  const firstOnly = new WeakMap();
+
+  function edgeClasses(children) {
+    if (children.length < 2) return [];
+    const [first, ...rest] = children;
+    return [...first.classList].filter((name) => !rest.some((child) => child.classList.contains(name)));
+  }
+
+  function moveEdgeClasses(container) {
+    const names = firstOnly.get(container) ?? [];
+    [...container.children].forEach((child, i) => {
+      for (const name of names) {
+        // toggle() with a force that matches is not a mutation, so this stays quiet on re-runs.
+        if (child.classList.contains(name) !== (i === 0)) child.classList.toggle(name, i === 0);
+      }
+    });
+  }
+
   /** Returns true when the DOM had to move. */
   function newestFirst(container) {
     const children = [...container.children];
     if (!children.length) return false;
+    if (!firstOnly.has(container)) firstOnly.set(container, edgeClasses(children));
 
     let next = children.reduce(
       (highest, child) => Math.max(highest, Number(child.dataset[ORDER] ?? -1)), -1) + 1;
@@ -59,21 +86,24 @@
     const wanted = [...children].sort(
       (a, b) => Number(b.dataset[ORDER]) - Number(a.dataset[ORDER]));
     // Touching the DOM unconditionally would retrigger the observer for ever.
-    if (wanted.every((child, i) => child === children[i])) return false;
-
-    for (const child of wanted) container.appendChild(child);
-    return true;
+    const moved = !wanted.every((child, i) => child === children[i]);
+    if (moved) for (const child of wanted) container.appendChild(child);
+    moveEdgeClasses(container);
+    return moved;
   }
 
   function apply() {
     if (!isOnCommitsTab()) return;
 
-    const timeline = need(document, TIMELINE, 'Timeline container');
-    if (!timeline) return;
-    if (!need(timeline, COMMIT_UL, 'Commit list')) return;
+    const title = need(document, DAY_TITLE, 'Commit day heading');
+    if (!title) return;
+    if (!need(document, COMMIT_ROW, 'Commit row')) return;
 
-    for (const ul of timeline.querySelectorAll(COMMIT_UL)) newestFirst(ul);
-    newestFirst(timeline);
+    const lists = new Set([...document.querySelectorAll(COMMIT_ROW)].map((row) => row.parentElement));
+    for (const list of lists) newestFirst(list);
+
+    const timeline = title.closest('li')?.parentElement;
+    if (timeline) newestFirst(timeline);
   }
 
   // setTimeout, not rAF. See CLAUDE.md "SPA navigation".
