@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Repo & Org Nav Reorder
 // @namespace    https://github.com/
-// @version      3.5.0
+// @version      3.6.0
 // @description  Reorders the repo and org tab navs, flattens the "More" overflow, adds a Releases tab, and hides tab icons without flicker
 // @author       Franco Gilio
 // @match        https://github.com/*
@@ -28,6 +28,11 @@
 
   const VIS_SEL = 'ul.prc-components-UnderlineItemList-xKlKC';
   const DD_SEL  = 'ul.prc-ActionList-ActionList-rPFF2';
+  // Since 2026-10 the UnderlineNav keeps every tab in VIS_SEL and puts a "More"
+  // button beside the list instead of moving tabs into DD_SEL. The list scrolls
+  // here, so that button only duplicates it. Keyed on Primer's data-component,
+  // not on its hashed container class.
+  const MORE_SEL = 'button[data-component="overflow-menu-button"]';
 
   // VIS_SEL and DD_SEL are hashed Primer CSS-module names, so they are the two
   // things here that change without notice. An absent nav is not worth reporting
@@ -82,6 +87,7 @@ ${NAV} ${VIS_SEL} {
 ${NAV} ${VIS_SEL}::-webkit-scrollbar { display: none !important; }
 ${NAV} ${VIS_SEL} > li:not([data-fg-overflow-container]) { flex: 0 0 auto !important; }
 ${NAV} li[data-fg-overflow-container] { display: none !important; }
+${NAV} :has(> ${MORE_SEL}) { display: none !important; }
 
 /* The icon span's presence flips with viewport width during hydration, so hide it
    declaratively rather than on a JS tick. */

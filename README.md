@@ -73,7 +73,7 @@ the observer simply runs again).
 | Script | Risk | What breaks it |
 |---|---|---|
 | `github-pr-commits-newest-first` | low | `h3[data-testid="commit-group-title"]`, `li[data-testid="commit-row-item"]`, GitHub test ids |
-| `github-nav-reorder` | high | `ul.prc-components-UnderlineItemList-xKlKC`, `ul.prc-ActionList-ActionList-rPFF2`, both hashed. Fails safe: the nav reveals itself unreordered after 1.5 s |
+| `github-nav-reorder` | high | `ul.prc-components-UnderlineItemList-xKlKC`, `ul.prc-ActionList-ActionList-rPFF2`, both hashed. Hides the "More" button by `button[data-component="overflow-menu-button"]`, durable. Fails safe: the nav reveals itself unreordered after 1.5 s |
 | `laravel-cloud-collapsible-permissions` | medium | Structural heuristics ("a div whose 2 children look like a header and a checkbox list") plus literal `color(display-p3 ...)` tokens sampled from the live page |
 | `laravel-cloud-nightwatch-linker` | medium | Finds its mount point by the button text "Visit" and by `aside button[role=combobox]` |
 | `laravel-cloud-copy-deployment-logs` | medium | Reads the deployment payload out of the page's own JSON script, keyed on `deploymentBuildSteps` / `deploymentDeploySteps`. Mounts on `div.sticky.justify-between` and `button.group/inner`. Degrades to copying the expanded log when the payload stops making sense |
