@@ -2,8 +2,9 @@
 //
 //   node test/amazon-image-viewer-arrow-keys.test.js      (or bin/test.sh to run every test)
 //
-// The script is evaluated against a DOM stub holding the viewer and its thumbnails.
-// A thumbnail click moves the `selected` class, as Amazon's own handler does.
+// The script is evaluated against a DOM stub holding the viewer and its thumbnails,
+// and optionally a review gallery. A thumbnail click moves the `selected` class,
+// and a gallery button moves the position and hides at the ends, as Amazon's own handlers do.
 const fs = require('fs');
 const vm = require('vm');
 const src = fs.readFileSync('scripts/amazon-image-viewer-arrow-keys.user.js', 'utf8');
@@ -35,7 +36,7 @@ class Element {
   }
 }
 
-function buildPage({ thumbCount = 4, selectedIndex = 0, viewerOpen = true } = {}) {
+function buildPage({ thumbCount = 4, selectedIndex = 0, viewerOpen = true, reviewGallery = null } = {}) {
   const thumbs = Array.from({ length: thumbCount }, () => new Element());
   thumbs.forEach(thumb => {
     thumb.click = () => thumbs.forEach(other => { other.selected = other === thumb; });
@@ -49,7 +50,10 @@ function buildPage({ thumbCount = 4, selectedIndex = 0, viewerOpen = true } = {}
   const warnings = [];
   const document = {
     querySelector: selector => (selector === '#ivMain' ? viewer : null),
-    querySelectorAll: selector => (selector === '#ivThumbs .ivThumb[id^="ivImage_"]' ? thumbs : []),
+    querySelectorAll(selector) {
+      if (selector === '#ivThumbs .ivThumb[id^="ivImage_"]') return thumbs;
+      return reviewGallery && reviewGallery.selector === selector ? reviewGallery.roots : [];
+    },
   };
   const window = {
     addEventListener: (type, handler, capture) => listeners.push({ type, handler, capture }),
@@ -72,6 +76,44 @@ function buildPage({ thumbCount = 4, selectedIndex = 0, viewerOpen = true } = {}
     },
   };
 }
+
+function buildReviewGallery({ selector, previous, next, itemCount = 3, position = 0, rendered = true, buttons = true }) {
+  const gallery = { selector, position, roots: [] };
+
+  // A closed popover of the same kind sits ahead of the open one in the DOM.
+  gallery.roots.push(Object.assign(new Element(), { offsetParent: null, querySelector: () => null }));
+
+  const button = (step, isAvailable) => {
+    const element = new Element();
+    Object.defineProperty(element, 'offsetParent', { get: () => (isAvailable() ? new Element() : null) });
+    element.click = () => { gallery.position += step; };
+    return element;
+  };
+  const previousButton = button(-1, () => gallery.position > 0);
+  const nextButton = button(1, () => gallery.position < itemCount - 1);
+
+  const root = new Element();
+  root.offsetParent = rendered ? new Element() : null;
+  root.querySelector = wanted => {
+    if (!buttons) return null;
+    return { [previous]: previousButton, [next]: nextButton }[wanted] || null;
+  };
+  gallery.roots.push(root);
+
+  return gallery;
+}
+
+const POPOVER_GALLERY = {
+  selector: '[class*="media-popover-media-container"]',
+  previous: '[class*="left-icon-container"]',
+  next: '[class*="right-icon-container"]',
+};
+
+const LIGHTBOX_GALLERY = {
+  selector: '.cr-lightbox-image-viewer',
+  previous: '.cr-lightbox-navigator-button__back',
+  next: '.cr-lightbox-navigator-button__next',
+};
 
 // --- cases ------------------------------------------------------------------
 
@@ -126,6 +168,54 @@ function buildPage({ thumbCount = 4, selectedIndex = 0, viewerOpen = true } = {}
   page.press('ArrowRight');
   page.press('ArrowRight');
   check('no selected thumbnail warns once and selects nothing', [page.warnings.length, page.selected()], [1, -1]);
+}
+
+for (const [name, kind] of [['product page gallery', POPOVER_GALLERY], ['reviews page lightbox', LIGHTBOX_GALLERY]]) {
+  {
+    const reviewGallery = buildReviewGallery({ ...kind, position: 1 });
+    const page = buildPage({ viewerOpen: false, reviewGallery });
+    const event = page.press('ArrowRight');
+    check(`${name}: ArrowRight clicks next`, [reviewGallery.position, event.defaultPrevented], [2, true]);
+    page.press('ArrowLeft');
+    page.press('ArrowLeft');
+    check(`${name}: ArrowLeft clicks previous`, reviewGallery.position, 0);
+  }
+
+  {
+    const reviewGallery = buildReviewGallery({ ...kind, position: 2 });
+    const page = buildPage({ viewerOpen: false, reviewGallery });
+    const event = page.press('ArrowRight');
+    check(`${name}: the last item leaves the arrow to the page`, [reviewGallery.position, event.defaultPrevented], [2, false]);
+  }
+
+  {
+    const reviewGallery = buildReviewGallery({ ...kind });
+    const page = buildPage({ viewerOpen: false, reviewGallery });
+    const event = page.press('ArrowLeft');
+    check(`${name}: the first item leaves the arrow to the page`, [reviewGallery.position, event.defaultPrevented], [0, false]);
+  }
+
+  {
+    const reviewGallery = buildReviewGallery({ ...kind, rendered: false });
+    const page = buildPage({ viewerOpen: false, reviewGallery });
+    const event = page.press('ArrowRight');
+    check(`${name}: a closed gallery ignores arrows`, [reviewGallery.position, event.defaultPrevented], [0, false]);
+  }
+
+  {
+    const reviewGallery = buildReviewGallery({ ...kind, buttons: false });
+    const page = buildPage({ viewerOpen: false, reviewGallery });
+    page.press('ArrowRight');
+    page.press('ArrowRight');
+    check(`${name}: missing buttons warn once and do nothing`, [page.warnings.length, reviewGallery.position], [1, 0]);
+  }
+}
+
+{
+  const reviewGallery = buildReviewGallery({ ...POPOVER_GALLERY });
+  const page = buildPage({ selectedIndex: 1, reviewGallery });
+  page.press('ArrowRight');
+  check('an open image viewer wins over a review gallery', [page.selected(), reviewGallery.position], [2, 0]);
 }
 
 if (failures) {
