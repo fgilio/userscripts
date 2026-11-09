@@ -110,7 +110,8 @@ Best result, in order of preference:
 2. **Reuse the site's class names**. Only while they are plain words. GitHub's Primer CSS
    classes (`ActionListItem`) looked stable until the Actions sidebar moved to Primer React
    in 2026-10, where every class is hashed (`prc-ActionList-ActionListItem-So4vC`). The
-   CI pin broke that day. Prefer 1.
+   CI pin broke that day, and again in 2026-11 when the sidebar moved to a `Sidebar.*`
+   component. Prefer 1.
 3. **Hand-styled inline CSS** with tokens sampled from the live page. Last resort, and this is why
    `laravel-cloud-collapsible-permissions` carries a block of literal
    `color(display-p3 ...)` values.
@@ -239,7 +240,7 @@ editor, so this repo stays authoritative.
 
 | Site | Icon URL | Nav events | Notes |
 |---|---|---|---|
-| GitHub | `https://github.githubassets.com/favicons/favicon.svg` | `soft-nav:end` first, then turbo/pjax | Mixed React + Turbo. Primer React hashes its classes too (`prc-*-So4vC`), so key on its `data-component` attributes (`ActionList.Item`) and on `aria-label`. On its React pages (Actions) the router soft-navigates a same-origin `<a>` click, injected ones included |
+| GitHub | `https://github.githubassets.com/favicons/favicon.svg` | `soft-nav:end` first, then turbo/pjax | Mixed React + Turbo. Primer React hashes its classes too (`prc-*-So4vC`), so key on its `data-component` attributes (`Sidebar.Item`, `ActionList.Item`) and on `aria-label`. Where state lives only in a hashed class (`current__itRjMz`), match the stem before the hash. On its React pages (Actions) the router soft-navigates a same-origin `<a>` click, injected ones included |
 | Laravel Cloud | `https://cloud.laravel.com/.../apple-touch-icon.png` | none, observe the body | React + Headless UI + Inertia. Re-renders on every checkbox toggle, so drive controls one at a time with a ~60 ms gap. The Inertia payload sits in a `script[type=application/json]` beside the app root and is written once at first paint, so it is stale after any soft nav: re-fetch the current URL and check the payload against it before trusting it |
 | ChatGPT (retired) | `https://www.google.com/s2/favicons?sz=64&domain=chatgpt.com` | none, MutationObserver | Tailwind classes are generated, so clone a sibling |
 | Google Docs | n/a | n/a | Closure Library: needs the full `mouseenter`, `mouseover`, `mousedown`, `mouseup`, `click` sequence, plus a capture-phase key listener |

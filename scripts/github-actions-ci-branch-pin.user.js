@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Actions — CI + default branch pin
 // @namespace    https://github.com/fgilio
-// @version      1.3.0
+// @version      1.4.0
 // @description  Pins a "CI+main" filter at the top of the GitHub Actions sidebar: one click to the CI workflow runs on the repository default branch.
 // @author       Franco Gilio
 // @icon         https://github.githubassets.com/favicons/favicon.svg
@@ -32,31 +32,40 @@
 
   const TAG = '[ci-pin]';
   const PIN_ID = 'fg-workflow-branch-pin';
-  const DIVIDER_ID = `${PIN_ID}-divider`;
+  const SECTION_ID = `${PIN_ID}-section`;
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const BOLT_PATH = 'M9.6 1 3.2 9.2h4L6.4 15l6.4-8.2h-4L9.6 1Z';
 
   // The GitHub markup this script depends on, named so a miss can be reported.
-  // Primer React hashes its class names (prc-ActionList-ActionListItem-So4vC),
-  // so every hook here is an aria-label or a data-component, which it does not.
-  const SIDEBAR = 'nav[aria-label="Actions workflows"]';
-  const SIDEBAR_LIST = `${SIDEBAR} > ul`;
-  const ITEM = 'li[data-component="ActionList.Item"]';
-  const ITEM_LABEL = '[data-component="ActionList.Item.Label"]';
-  const ITEM_ICON = '[data-component="ActionList.LeadingVisual"]';
-  const ITEM_TRAILING = '[data-component="ActionList.TrailingAction"]';
+  // GitHub hashes its class names (Item__jZ1pZ3, current__itRjMz), so every hook
+  // here is an aria-label, a data-component or a data-* flag, which it does not.
+  // 2026-11: the Actions sidebar moved from ActionList to this Sidebar component.
+  const SIDEBAR = 'aside[aria-label="Actions"] nav[data-component="Sidebar.Main"]';
+  const SECTION = '[data-component="Sidebar.Section"]';
+  const ITEM = '[data-component="Sidebar.Item"]';
+  const ITEM_LABEL = 'a > [data-sidebar-collapse-content]';
+  const ITEM_ICON = 'a svg';
+  const ITEM_EXTRAS = '[data-component="Sidebar.Action"], [role="tooltip"]';
+  /**
+   * The current item is marked by a hashed class only (current__itRjMz on the
+   * item, current__3yAyXP on its link), and no attribute the CSS reads. The
+   * stem before the hash is the durable part, so match on that.
+   */
+  const CURRENT_CLASS = /^current__/;
 
   const inFlight = new Set();
 
-  // Without this, a Primer markup change presents as "the pin stopped appearing".
+  // Without this, a GitHub markup change presents as "the pin stopped appearing".
   const warned = new Set();
+  function warnOnce(key, message) {
+    if (warned.has(key)) return;
+    warned.add(key);
+    console.warn(message);
+  }
   function need(root, selector, what) {
     const el = root.querySelector(selector);
     if (el) { warned.delete(selector); return el; }
-    if (!warned.has(selector)) {
-      warned.add(selector);
-      console.warn(`${TAG} ${what} not found (selector "${selector}"). Site markup changed. Update the selector in this script.`);
-    }
+    warnOnce(selector, `${TAG} ${what} not found (selector "${selector}"). Site markup changed. Update the selector in this script.`);
     return null;
   }
 
@@ -131,9 +140,9 @@
   }
 
   /** The sidebar link for the pinned workflow, if this repository has one. */
-  function workflowLink(list) {
-    for (const label of list.querySelectorAll(`${ITEM} ${ITEM_LABEL}`)) {
-      if (label.closest(`#${PIN_ID}`)) continue;
+  function workflowLink(sidebar) {
+    for (const label of sidebar.querySelectorAll(`${ITEM} > ${ITEM_LABEL}`)) {
+      if (label.closest(`#${SECTION_ID}`)) continue;
       if (label.textContent.trim().toLowerCase() !== WORKFLOW_LABEL_LC) continue;
       const link = label.closest('a');
       if (link?.pathname.includes('/actions/workflows/')) return link;
@@ -159,52 +168,64 @@
     return svg;
   }
 
+  /** The hashed "current" classes GitHub put on an item and its link. */
+  function currentClasses(el) {
+    return [...el.classList].filter((name) => CURRENT_CLASS.test(name));
+  }
+
+  // Learned from whichever item GitHub marks current, since the hash is per build.
+  // Every Actions view has one (All workflows, or a workflow), so this fills in
+  // before the pin can ever need it.
+  let learned = { item: [], link: [] };
+  function learnCurrentClasses(sidebar) {
+    const link = sidebar.querySelector(`${ITEM} > a[aria-current="page"]`);
+    if (!link) return;
+    const item = currentClasses(link.parentElement);
+    const own = currentClasses(link);
+    if (item.length || own.length) learned = { item, link: own };
+    else warnOnce('current-class', `${TAG} The current sidebar item has no class matching ${CURRENT_CLASS}. The pin cannot show itself as current. Update CURRENT_CLASS.`);
+  }
+
+  /** Marks an item current or not, the way GitHub does: aria-current plus the hashed classes. */
+  function setCurrent(item, link, on) {
+    link.ariaCurrent = on ? 'page' : null;
+    for (const name of learned.item) item.classList.toggle(name, on);
+    for (const name of learned.link) link.classList.toggle(name, on);
+  }
+
   /**
    * Clones a native sidebar item rather than rebuilding one, so the pin inherits
-   * whatever hashed classes this Primer React build ships. See CLAUDE.md
-   * "Making injected UI look native". Null until an item with an icon exists.
+   * whatever hashed classes this build ships. See CLAUDE.md "Making injected UI
+   * look native". It sits in its own section, cloned from the first one, so the
+   * site's own rule draws the line between it and "All workflows" (every section
+   * but the first carries a top border). Null until an item with an icon exists.
    */
-  function buildPin(list) {
-    const template = [...list.querySelectorAll(`:scope > ${ITEM}`)].find((li) => li.querySelector(ITEM_ICON));
-    if (!template) return null;
+  function buildPin(sidebar) {
+    const firstSection = sidebar.querySelector(SECTION);
+    const template = [...sidebar.querySelectorAll(ITEM)].find((el) => el.querySelector(ITEM_ICON));
+    if (!firstSection || !template) return null;
 
     const item = template.cloneNode(true);
     item.id = PIN_ID;
-    item.removeAttribute('data-active');
-    item.querySelector(ITEM_TRAILING)?.remove();
+    for (const el of item.querySelectorAll(ITEM_EXTRAS)) el.remove();
     // React ids would duplicate the original's, and aria-labelledby would point back at it.
     for (const el of item.querySelectorAll('[id]')) el.removeAttribute('id');
     const link = item.querySelector('a');
     for (const attr of ['aria-labelledby', 'aria-current', 'data-discover']) link.removeAttribute(attr);
+    // The template is "All workflows", which is current on /actions.
+    for (const el of [item, link]) el.classList.remove(...currentClasses(el));
 
-    const icon = item.querySelector(`${ITEM_ICON} svg`);
-    if (icon) icon.replaceWith(boltIcon(icon));
-    else item.querySelector(ITEM_ICON)?.append(boltIcon(null));
-    return item;
-  }
+    const icon = item.querySelector(ITEM_ICON);
+    icon.replaceWith(boltIcon(icon));
 
-  function buildDivider() {
-    const divider = document.createElement('li');
-    divider.id = DIVIDER_ID;
-    divider.setAttribute('role', 'presentation');
-    divider.setAttribute('aria-hidden', 'true');
-    return divider;
-  }
-
-  // The React ActionList has no section divider to clone, so this one line is hand-styled.
-  function addStyles() {
-    if (document.getElementById(`${PIN_ID}-styles`)) return;
-    const style = document.createElement('style');
-    style.id = `${PIN_ID}-styles`;
-    style.textContent = `
-      #${DIVIDER_ID} { list-style: none; height: 1px; margin: 8px; background: var(--borderColor-muted, #d1d9e0b3); }
-    `;
-    document.head.append(style);
+    const section = firstSection.cloneNode(false);
+    section.id = SECTION_ID;
+    section.append(item);
+    return section;
   }
 
   function removePin() {
-    document.getElementById(PIN_ID)?.remove();
-    document.getElementById(DIVIDER_ID)?.remove();
+    document.getElementById(SECTION_ID)?.remove();
   }
 
   function apply() {
@@ -215,17 +236,17 @@
     }
 
     // The sidebar is absent for a moment on every navigation, so only report it
-    // once the workflow list in the main pane exists, by which point a miss is a
+    // once the run list in the main pane exists, by which point a miss is a
     // real markup change.
-    const list = document.querySelector(SIDEBAR_LIST);
-    if (!list) {
-      if (document.querySelector('a[href*="/actions/runs/"]')) need(document, SIDEBAR_LIST, 'Actions sidebar list');
+    const sidebar = document.querySelector(SIDEBAR);
+    if (!sidebar) {
+      if (document.querySelector('a[href*="/actions/runs/"]')) need(document, SIDEBAR, 'Actions sidebar');
       removePin();
       return;
     }
 
     // No workflow by this name in this repository: nothing to pin, and that is fine.
-    const workflow = workflowLink(list);
+    const workflow = workflowLink(sidebar);
     if (!workflow) {
       removePin();
       return;
@@ -238,12 +259,13 @@
     const query = new URLSearchParams(location.search).get('query')?.trim();
     const isCurrent = location.pathname === workflow.pathname && query === `branch:${branch}`;
 
-    addStyles();
-    const pin = document.getElementById(PIN_ID) ?? buildPin(list);
-    if (!pin) {
-      need(list, `:scope > ${ITEM} ${ITEM_ICON}`, 'Sidebar item with an icon, to clone');
+    learnCurrentClasses(sidebar);
+    const section = document.getElementById(SECTION_ID) ?? buildPin(sidebar);
+    if (!section) {
+      need(sidebar, `${ITEM} ${ITEM_ICON}`, 'Sidebar item with an icon, to clone');
       return;
     }
+    const pin = section.querySelector(`#${PIN_ID}`);
     const link = pin.querySelector('a');
     const label = pin.querySelector(ITEM_LABEL);
     const text = `${workflow.textContent.trim()}+${branch}`;
@@ -252,9 +274,7 @@
     // href still navigates softly, without a page load.
     link.href = href;
     link.ariaLabel = text;
-    link.ariaCurrent = isCurrent ? 'page' : null;
-    if (isCurrent) pin.dataset.active = 'true';
-    else delete pin.dataset.active;
+    setCurrent(pin, link, isCurrent);
     // Guarded, unlike the writes above: assigning textContent replaces a child
     // node, which the childList observer sees, re-entering apply() forever.
     if (label.textContent !== text) label.textContent = text;
@@ -265,13 +285,13 @@
     // mark is taken off for the pinned view and handed back for any other view of
     // that path. Attribute writes do not trip the childList observer, so this never loops.
     const workflowItem = workflow.closest(ITEM);
-    if (workflowItem && location.pathname === workflow.pathname && Boolean(workflowItem.dataset.active) === isCurrent) {
-      if (isCurrent) delete workflowItem.dataset.active;
-      else workflowItem.dataset.active = 'true';
-      workflow.ariaCurrent = isCurrent ? null : 'page';
+    const workflowMarked = workflow.getAttribute('aria-current') === 'page';
+    if (workflowItem && location.pathname === workflow.pathname && workflowMarked === isCurrent) {
+      setCurrent(workflowItem, workflow, !isCurrent);
     }
 
-    if (!pin.isConnected) list.prepend(pin, buildDivider());
+    // Before the first section, not inside it: React owns that section's children.
+    if (!section.isConnected) sidebar.querySelector(SECTION)?.before(section);
   }
 
   let scheduled = false;
