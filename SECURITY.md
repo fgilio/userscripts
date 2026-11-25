@@ -15,16 +15,14 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
   analytics, no error reporting, and no phone-home of any kind.
 - **No credential access.** No script reads `document.cookie`, `localStorage`, or
   `sessionStorage`, and none touches a password or token field.
-- **No HTML is ever built from page data.** Two files assign `innerHTML`, three times
-  between them, and the operand is always SVG markup written into the script itself.
-  In `laravel-cloud-collapsible-permissions` it is the `CHEVRON_SVG` and `SEARCH_SVG`
-  constants declared at the top of the file. In `laravel-cloud-nightwatch-linker` it is
-  `cloudIconSvg()`, which concatenates a fixed path with a colour its caller passes as
-  a literal. Grep `innerHTML` to see all three. No page content, URL, or user input
-  reaches an HTML sink anywhere in the repo. The tradeoff is that those three
-  assignments would be rejected by a site sending `require-trusted-types-for`. No site
-  matched here sends it today, and `CLAUDE.md` records that as the trigger for switching
-  them to `createElementNS`, which `github-actions-ci-branch-pin` already uses.
+- **No HTML is ever built from page data.** One file assigns `innerHTML`, once, and
+  the operand is SVG markup written into the script itself: in
+  `laravel-cloud-nightwatch-linker` it is `cloudIconSvg()`, which concatenates a fixed
+  path with a colour its caller passes as a literal. Grep `innerHTML` to see it. No page
+  content, URL, or user input reaches an HTML sink anywhere in the repo. The tradeoff is
+  that the assignment would be rejected by a site sending `require-trusted-types-for`.
+  No site matched here sends it today, and `CLAUDE.md` records that as the trigger for
+  switching it to `createElementNS`, which `github-actions-ci-branch-pin` already uses.
 - **Narrow `@match`.** Each script matches the smallest URL pattern that works. No
   script matches `*` or `<all_urls>`.
 - **`@noframes` by default.** Only `universal-sidebar-toggle` runs in frames, and it is
@@ -45,7 +43,6 @@ dependencies, so reading one end to end is a realistic thing to ask of you.
 | `github-pr-omnibox-shortcut` | none | none | On a Google search typed into Chrome's address bar, reads the query and, when it looks like `repo#N`, sends the tab to that GitHub PR with `location.replace`. The query is never sent anywhere else |
 | `linear-issue-omnibox-shortcut` | none | none | On a Google search typed into Chrome's address bar, reads the query and, when it looks like `lKEY-N`, sends the tab to that Linear issue with `location.replace`. The query is never sent anywhere else |
 | `laravel-cloud-copy-deployment-logs` | One same-origin `fetch` of the deployment page you are already on, with `credentials: 'same-origin'` | none | Writes to the clipboard, only when you click a copy control |
-| `laravel-cloud-collapsible-permissions` | none | none | Clicks permission checkboxes on your behalf when you press Select all / Clear |
 | `laravel-cloud-firewall-rules-unclip` | none | none | Sets inline flex/overflow styles on existing firewall rule rows and a `title` attribute carrying each rule's own name. Adds nothing else and clicks nothing |
 | `laravel-cloud-firewall-rule-ids` | One same-origin `fetch` of the zone page you are already on, with `credentials: 'same-origin'` | none | Adds one line of text, a rule's own provider id, under each rule name in the table and under the name field of the rule editor. Clicks nothing, and writes to no field |
 | `laravel-cloud-nightwatch-linker` | none | `GM_setValue`: a map of Laravel Cloud environment paths to Nightwatch environment UUIDs | Uses `prompt()` once per pairing to read a URL you paste |

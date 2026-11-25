@@ -1,3 +1,17 @@
+// RETIRED 2026-11-25. Do not reinstall.
+//
+// Obsolete, verified live on cloud.laravel.com. The API token form is now a side
+// drawer, and its permissions are a dropdown with everything this script added:
+//   - a "Search permissions" box (and "Search applications and environments" on
+//     the Access list, which replaces the Resources search box),
+//   - "Select all", which turns into "Deselect all" (this script's Select all / Clear),
+//   - an "N selected" count on the dropdown (this script's live count).
+// The list is now flat, so there are no categories to collapse. The script's
+// anchors (a div holding a header and a checkbox list) match nothing in the new
+// form, so it did nothing at all.
+//
+// Kept only as a record of what was tried. Delete it from Tampermonkey.
+
 // ==UserScript==
 // @name         Laravel Cloud - Collapsible Permission Categories
 // @namespace    https://cloud.laravel.com/

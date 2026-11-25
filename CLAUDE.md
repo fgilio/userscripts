@@ -112,9 +112,9 @@ Best result, in order of preference:
    in 2026-10, where every class is hashed (`prc-ActionList-ActionListItem-So4vC`). The
    CI pin broke that day, and again in 2026-11 when the sidebar moved to a `Sidebar.*`
    component. Prefer 1.
-3. **Hand-styled inline CSS** with tokens sampled from the live page. Last resort, and this is why
-   `laravel-cloud-collapsible-permissions` carries a block of literal
-   `color(display-p3 ...)` values.
+3. **Hand-styled inline CSS** with tokens sampled from the live page. Last resort. The
+   retired `laravel-cloud-collapsible-permissions` carried a block of literal
+   `color(display-p3 ...)` values, and they were stale the day the form was redesigned.
 
 Build SVG with `createElementNS`, not `innerHTML`, so Trusted-Types pages cannot reject it.
 No site in this repo sent `require-trusted-types-for` as of 2026-08-19, so `bin/check.sh`
