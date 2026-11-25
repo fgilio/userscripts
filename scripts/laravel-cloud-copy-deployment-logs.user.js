@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Laravel Cloud Copy Deployment Logs
 // @namespace    https://github.com/fgilio
-// @version      1.2.0
+// @version      1.2.1
 // @description  Adds a copy button to every step and every section of a Laravel Cloud deployment, so a build or deploy log reaches the clipboard as plain text without expanding anything
 // @author       Franco Gilio
 // @match        https://cloud.laravel.com/*
@@ -31,7 +31,10 @@
     // The Inertia page payload, a plain JSON script beside the app root. It
     // carries the complete log text of every step, expanded or not.
     payload: 'script[type="application/json"]',
-    sectionHeader: 'div.sticky.justify-between',
+    // The header row of each section: the one justify-between row that holds the
+    // section's <strong> title two levels down. It lost its `sticky` class in
+    // 2026-11, which is why this keys on the shape rather than on that class.
+    sectionHeader: 'div.justify-between:has(> div > div > strong)',
     sectionTitle: 'strong',
     stepHeader: 'button.group\\/inner',
     stepTitle: ':scope > p',

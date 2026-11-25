@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GitHub Issue/PR/Run Number in Tab Title
 // @namespace    https://github.com/
-// @version      1.4.0
+// @version      1.5.0
 // @description  Prefixes the tab title with the issue/PR/discussion number, plus a CI pass/fail/pending marker on PRs so a background tab shows the result without switching to it
 // @author       Franco Gilio
 // @match        https://github.com/*
@@ -32,23 +32,63 @@
   const STATUS_PENDING = '\u2026';
   const STATUS_PASS = '\u2713';
 
-  // The merge box states the overall verdict in exactly one <h3>. Verified against a
-  // passing, a failing and a pending PR, and it is the only signal that survives all
-  // three: the per-check aria-labels vanish because GitHub collapses the checks list
-  // on a green PR, and the "N / M checks OK" summary icon appears once per commit in
-  // the timeline, so there is no single one of those to trust. Ordered failure-first,
-  // because a failure outranks anything else on the page.
+  // The merge box redesign (2026-11) draws the Checks tile as a progress bar, one
+  // segment per status, each tagged `data-testid="checks-progress-<kind>"`. Verified
+  // 2026-11-25 against a failing (`required-failure`, `optional-failure`), an
+  // attention-needed (`attention-required`), a pending (`pending`) and a green PR
+  // (`success`, `skipped`, `neutral`). The segments render whether the tile is
+  // open or shut, so they are the one signal that does not depend on a click.
+  const SEGMENT_PREFIX = 'checks-progress-';
+  const SEGMENT = `[data-testid="mini-status"] [data-testid^="${SEGMENT_PREFIX}"]`;
+  // Ordered failure-first, because a failure outranks anything else on the page.
+  const SEGMENT_KINDS = [
+    [/fail|error|cancel|timed-out|attention|action/, STATUS_FAIL],
+    [/pending|queued|progress|waiting|expected|running/, STATUS_PENDING],
+    [/success|skipped|neutral|stale/, STATUS_PASS],
+  ];
+
+  // The merge box before the redesign stated its verdict in one <h3>. GitHub still
+  // offers the old one (the "Preview" toggle on the PR header), so it stays as a
+  // fallback, read only when the page has no progress segments.
   const OVERALL = [
     [/not successful|have failed/i, STATUS_FAIL],
     [/haven't completed|are queued|in progress|still running/i, STATUS_PENDING],
     [/have passed|checks passed/i, STATUS_PASS],
   ];
 
+  let warnedKind = false;
+
+  /** The marker from the progress segments, null when none decides it, undefined when there are none. */
+  function segmentStatus() {
+    const kinds = [...document.querySelectorAll(SEGMENT)]
+      .map(segment => segment.getAttribute('data-testid').slice(SEGMENT_PREFIX.length));
+    if (!kinds.length) return undefined;
+
+    const found = new Set();
+    for (const kind of kinds) {
+      const match = SEGMENT_KINDS.find(([pattern]) => pattern.test(kind));
+      if (match) { found.add(match[1]); continue; }
+      // An unknown kind could be anything, so it never counts as a pass.
+      found.add(null);
+      if (!warnedKind) {
+        warnedKind = true;
+        console.warn(`${TAG} unknown checks progress segment "${SEGMENT_PREFIX}${kind}". Add it to SEGMENT_KINDS.`);
+      }
+    }
+    if (found.has(STATUS_FAIL)) return STATUS_FAIL;
+    if (found.has(STATUS_PENDING)) return STATUS_PENDING;
+    if (found.has(null)) return null;
+    return STATUS_PASS;
+  }
+
   // Null on anything that is not a PR, and null until the merge box hydrates. The
   // body observer re-runs apply() when it does, so the marker arrives a moment after
   // the number rather than not at all.
   function checksStatus() {
     if (!PR_RE.test(location.pathname)) return null;
+
+    const fromSegments = segmentStatus();
+    if (fromSegments !== undefined) return fromSegments;
 
     for (const heading of document.querySelectorAll('h3')) {
       const text = heading.textContent;

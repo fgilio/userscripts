@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Sidebar Toggle with Hyper Key
 // @namespace    http://tampermonkey.net/
-// @version      4.0.0
+// @version      4.1.0
 // @description  Toggle sidebar on multiple sites with macOS hyper key (Cmd+Shift+Ctrl+Option+S)
 // @author       Franco Gilio
 // @match        https://gitlab.com/*
@@ -39,27 +39,28 @@
       selectors: ['[data-testid="super-sidebar-collapse-button"]']
     },
 
+    // One "Toggle sidebar" button for both states since 2026-11. Its aria-expanded
+    // stays "true" either way, so nothing here reads it.
     'chatgpt.com': {
       selectors: [
-        '[data-testid="close-sidebar-button"]',
-        '[aria-label="Open sidebar"]'
+        'button[aria-controls="app-shell-sidebar"]',
+        'button[aria-label="Toggle sidebar"]'
       ],
       usePointerEvents: true
     },
 
     'chat.openai.com': {
       selectors: [
-        '[data-testid="close-sidebar-button"]',
-        '[aria-label="Open sidebar"]'
+        'button[aria-controls="app-shell-sidebar"]',
+        'button[aria-label="Toggle sidebar"]'
       ],
       usePointerEvents: true
     },
 
     'claude.ai': {
       selectors: [
-        '[data-testid="pin-sidebar-toggle"]',
-        'button[aria-label="Collapse sidebar"]',
-        'button[aria-label="Open sidebar"]'
+        'button[aria-label="Hide sidebar"]',
+        'button[aria-label="Show sidebar"]'
       ]
     },
 
@@ -71,11 +72,14 @@
       selectors: ['[aria-label="Main menu"]']
     },
 
+    // The toggle relabels itself "Close sidebar" / "Open sidebar" and carries
+    // aria-expanded. A second "Open sidebar" button with no aria-expanded sits
+    // collapsed to zero width, so aria-expanded is what tells the two apart. The
+    // close button is visibility:hidden until hovered, hence skipVisibilityCheck.
     'gemini.google.com': {
       selectors: [
-        '[data-test-id="side-nav-menu-button"]',
-        'button[aria-label="Main menu"]',
-        '.main-menu-button'
+        'button[aria-expanded][aria-label="Close sidebar"]',
+        'button[aria-expanded][aria-label="Open sidebar"]'
       ],
       skipVisibilityCheck: true
     },
@@ -96,8 +100,8 @@
     // pointer-events:none that children override, and aggressive key capture.
     'docs.google.com': {
       selectors: [
-        '.navigation-widget-hat-close-floating-navigation-button',
-        '.miniChapterSwitcherView'
+        '[aria-label="Hide tabs & outlines"]',
+        'button[aria-label="Show tabs & outlines"]'
       ],
       skipVisibilityCheck: true,
       useMouseEvents: true,

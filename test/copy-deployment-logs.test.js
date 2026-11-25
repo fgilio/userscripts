@@ -211,7 +211,9 @@ function makeDocument(sections) {
     addEventListener() {},
     createElementNS: (namespace, tag) => el({ tag }),
     querySelector: () => null,
-    querySelectorAll: selector => (selector.includes('sticky') ? headers : []),
+    // The exact selector verified on the live page (2026-11-25), so a change to it
+    // in the script has to be made here too, on purpose.
+    querySelectorAll: selector => (selector === 'div.justify-between:has(> div > div > strong)' ? headers : []),
   };
   return { document, headers, rows };
 }
