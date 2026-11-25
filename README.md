@@ -8,7 +8,7 @@ modal with no "select all". Two dashboards that clearly know about each other an
 don't link to each other. A sidebar with a keyboard shortcut on one site and nothing on
 the next nine. None of it is hard to fix, which is the annoying part.
 
-Eight of these are GitHub, five are Laravel Cloud, one is Amazon, and one is a single
+Nine of these are GitHub, five are Laravel Cloud, one is Linear, one is Amazon, and one is a single
 sidebar toggle that behaves the same way across ten sites that each hide their sidebar
 behind a different button. They're built for my habits, so treat the list as a menu rather than a
 suite.
@@ -44,6 +44,7 @@ Changing anything locally, or want the whole set at once? See
 | [`github-nav-reorder`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-nav-reorder.user.js) | `github.com/*` | Repo tabs reordered to Settings, Code, Pull requests, Actions, Releases. Settings pulled to the front of the org nav. Flattens the "More" overflow, adds a synthetic Releases tab, hides all tab icons |
 | [`github-tab-title-numbers`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-tab-title-numbers.user.js) | `github.com/*` | Prefixes the tab title with the issue/PR/discussion number, and on PRs a CI marker (`✓` passed, `✗` failed, `…` still running) so a background tab shows the result without switching to it. On Actions run pages, uses the originating PR number, falling back to the run number |
 | [`github-auto-expand-single-check-group`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-auto-expand-single-check-group.user.js) | `github.com/*/*/pull/*` | On the PR Checks tab, expands every workflow when there are three or fewer. Above three, expands the one named `CI` plus any workflow holding a failure, whatever that one is called, falling back to all of them when neither exists |
+| [`github-pr-checks-always-open`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-checks-always-open.user.js) | `github.com/*/*/pull/*` | Opens the **Checks** panel of the merge box on the PR Overview, which GitHub renders collapsed, so the check list shows without a click. Hands off once you click a tile yourself (collapse Checks, open Comments), until you leave the page |
 | [`github-pr-checks-signal-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-checks-signal-first.user.js) | `github.com/*/*/pull/*` | On the PR Checks tab, floats whatever needs attention to the top: workflows are ordered by their worst job, jobs by their own status, and skipped jobs sink to the bottom dimmed. A single failure buried at row 16 of 17 ends up first |
 | [`github-pr-commits-newest-first`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-commits-newest-first.user.js) | `github.com/*/*/pull/*` | Reverses the PR Commits tab so the newest commit and newest day are on top |
 | [`github-pr-omnibox-shortcut`](https://raw.githubusercontent.com/fgilio/userscripts/main/scripts/github-pr-omnibox-shortcut.user.js) | `www.google.com/search` | Type `mentat#369` or `mentat/369` in Chrome's address bar and land on that PR in `publicala` instead of a Google search. `owner/repo#N` works for any other owner, and an issue number lands on the issue. Only address bar searches are redirected (Chrome tags them `sourceid=chrome`), never Google's own search box. Quote the query to search for it anyway |
@@ -65,10 +66,11 @@ Ranked by how likely they are to break. Hashed CSS-module class names change wit
 notice. When a script goes quiet, check the console first: it warns once and names what
 it looked for.
 
-Two scripts stay silent deliberately, because a missing target is a normal state for
+Three scripts stay silent deliberately, because a missing target is a normal state for
 them rather than a break: `github-auto-expand-single-check-group` (a PR with no check
-groups) and `github-tab-title-numbers` (the run label is null until React hydrates, and
-the observer simply runs again).
+groups), `github-pr-checks-always-open` (the merge box has not rendered yet, or the PR
+has no checks) and `github-tab-title-numbers` (the run label is null until React
+hydrates, and the observer simply runs again).
 
 | Script | Risk | What breaks it |
 |---|---|---|
@@ -84,6 +86,7 @@ the observer simply runs again).
 | `universal-sidebar-toggle` | low | Per-site `data-testid` / `aria-label` selectors, several per site as fallbacks |
 | `github-actions-ci-branch-pin` | medium | `aside[aria-label="Actions"]` and the Sidebar component's `data-component` attributes (`Sidebar.Main`, `Sidebar.Section`, `Sidebar.Item`) plus `data-sidebar-collapse-content` for the label, durable. Clones a native item and section. The current state is a hashed class only, matched on its `current__` stem and learned from the item GitHub marks current. Also parses `defaultBranch` out of the repo home page (warns on a miss), with the refs endpoint as fallback |
 | `github-auto-expand-single-check-group` | low | `details.checks-list-item` |
+| `github-pr-checks-always-open` | low | Each merge box tile is `[data-testid="mini-status"]`, and the Checks one is told apart by its `data-telemetry-action` (`pull_requests.checks.expand` / `.collapse`). Clicks the tile's title button, the one with `aria-expanded` that is in the tab order. Warns once when the Checks tile is there but that button is not |
 | `github-pr-checks-signal-first` | medium | Reads status from the `aria-label` on each job's icon (`This job failed`, `This job was skipped`), which is durable. Reorders the `div.js-socket-channel` wrappers GitHub live-updates over, which is the risky half |
 | `github-pr-omnibox-shortcut` | low | Reads only the `q` and `sourceid` query parameters. Breaks if Chrome stops tagging address bar searches with `sourceid=chrome`, or uses a Google host other than `www.google.com` |
 | `linear-issue-omnibox-shortcut` | low | Reads only the `q` and `sourceid` query parameters. Breaks for the same reasons as `github-pr-omnibox-shortcut`, or if Linear changes its `/<workspace>/issue/<ID>` URL shape |
